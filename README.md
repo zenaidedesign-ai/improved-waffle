@@ -6,9 +6,28 @@ Tujuan bisnis: menghasilkan lead interior berkualitas → percakapan WhatsApp �
 
 ## Status
 
-**Fase desain.** Belum ada kode aplikasi. Goal 1 (wajib pertama) adalah **Instagram & Meta Recovery Engine** — lihat blueprint lengkap:
+**Fase 1 terbangun** — Instagram & Meta Recovery Engine versi input manual (tanpa API eksternal):
+tiga audit gerbang (Akun Meta, Kelayakan Rekomendasi, Tracking), Diagnosa Distribusi Instagram,
+Algorithm Fit Score, Meta Ads Rescue dengan mesin vonis, dan War Room Mingguan.
 
-📄 [`docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md`](docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md)
+Dokumen desain:
+
+- 📄 [`docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md`](docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md)
+- 📄 [`docs/PLAN-GOAL-1-IMPLEMENTATION.md`](docs/PLAN-GOAL-1-IMPLEMENTATION.md)
+
+## Menjalankan
+
+```bash
+npm install
+cp .env.example .env        # DATABASE_URL SQLite lokal
+npx prisma migrate deploy   # membuat prisma/dev.db
+npm run dev                 # buka http://localhost:3000
+```
+
+Di Ruang Kendali, klik **“Muat data contoh”** untuk melihat seluruh diagnosa bekerja dengan data
+berlabel `[CONTOH]` (bisa dihapus satu klik, tidak menyentuh data asli).
+
+Uji: `npm run test` (51 unit test mesin aturan) · smoke E2E: `scripts/e2e-smoke.mjs`.
 
 ## Fondasi yang sudah diputuskan
 

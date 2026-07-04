@@ -1,0 +1,293 @@
+// Zenaide Revenue Engine — Goal 1 schema.
+// SQLite: no native enums, no Json type. All enum-like fields are String,
+// validated against the canonical lists in src/lib/domain/enums.ts at every
+// write boundary. JSON payloads are String columns (JSON.stringify).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Audits (Gates) ──────────────────────────────────────────────
+model AuditRun {
+  id        String        @id @default(cuid())
+  type      String // "META_ACCOUNT" | "REKOMENDASI" | "TRACKING"
+  runDate   DateTime      @default(now())
+  verdict   String // "MERAH" | "KUNING" | "HIJAU"
+  notes     String?
+  isExample Boolean       @default(false)
+  answers   AuditAnswer[]
+  verdicts  Verdict[]
+}
+
+model AuditAnswer {
+  id         String   @id @default(cuid())
+  auditRunId String
+  auditRun   AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  itemKey    String // META_ACCOUNT: A1..A13 · REKOMENDASI: R1..R6 · TRACKING: T1..T5
+  status     String // "MERAH" | "KUNING" | "HIJAU" | "BELUM_DICEK"
+  isBlocking Boolean // snapshot of the blocking flag at answer time
+  answerText String? // what the owner actually saw in Meta Business Suite / IG settings
+  note       String?
+
+  @@unique([auditRunId, itemKey])
+}
+
+// ── Instagram ───────────────────────────────────────────────────
+model IgPost {
+  id                   String      @id @default(cuid())
+  postedAt             DateTime
+  format               String // "REELS" | "CAROUSEL" | "FOTO" | "STORY"
+  pillar               String // see enums.ts (7 recovery pillars + PORTFOLIO_LAIN)
+  hook                 String
+  caption              String?
+  cta                  String?
+  reach                Int?
+  reachNonFollower     Int?
+  plays                Int?
+  watchTimeSec         Int?
+  retentionPct         Float?
+  likes                Int?
+  comments             Int?
+  saves                Int?
+  shares               Int?
+  profileVisits        Int?
+  follows              Int?
+  dmClicks             Int?
+  waClicks             Int?
+  leadsManual          Int? // manual attribution fallback (Leads module lands next phase)
+  qualifiedLeadsManual Int?
+  signalScore          Float? // cached engine output
+  isOrganicWinner      Boolean     @default(false)
+  adCandidateScore     Float?
+  experimentId         String?
+  experiment           Experiment? @relation(fields: [experimentId], references: [id])
+  isExample            Boolean     @default(false)
+  leads                Lead[]
+  fitScores            FitScore[]
+  verdicts             Verdict[]
+}
+
+model IgAccountSnapshot {
+  id                   String   @id @default(cuid())
+  weekStart            DateTime @unique
+  followerCount        Int?
+  reachTotal           Int?
+  reachNonFollowerPct  Float?
+  profileVisits        Int?
+  recommendationStatus String // "LAYAK" | "ADA_KONTEN_DITANDAI" | "PELANGGARAN" | "BELUM_DICEK"
+  notes                String?
+  isExample            Boolean  @default(false)
+}
+
+// ── Algorithm Fit Score ─────────────────────────────────────────
+model ContentIdea {
+  id         String     @id @default(cuid())
+  title      String
+  format     String
+  pillar     String
+  hook       String?
+  plannedCta String?
+  status     String     @default("IDE") // "IDE" | "DIJADWALKAN" | "DIPOSTING" | "DIBUANG"
+  igPostId   String?
+  notes      String?
+  createdAt  DateTime   @default(now())
+  isExample  Boolean    @default(false)
+  fitScores  FitScore[]
+}
+
+model FitScore {
+  id                    String       @id @default(cuid())
+  igPostId              String?
+  igPost                IgPost?      @relation(fields: [igPostId], references: [id])
+  contentIdeaId         String?
+  contentIdea           ContentIdea? @relation(fields: [contentIdeaId], references: [id])
+  // 11 dimensions, 0–5. Recommendation risk stored INVERTED as safety.
+  hook3s                Int
+  visualStopScroll      Int
+  painPointClarity      Int
+  originality           Int
+  savePotential         Int
+  sharePotential        Int
+  profileVisitPotential Int
+  waLeadPotential       Int
+  brandFit              Int
+  recommendationSafety  Int // 5 = aman direkomendasikan, 0 = berisiko
+  businessValue         Int
+  confidence            Int // 0–5, NOT part of composite
+  weightsJson           String // weights snapshot at scoring time
+  compositeScore        Float // cached, 0–100
+  confidenceLabel       String // "RENDAH" | "SEDANG" | "TINGGI"
+  scoredAt              DateTime     @default(now())
+  isExample             Boolean      @default(false)
+}
+
+// ── Experiments ─────────────────────────────────────────────────
+model Experiment {
+  id                       String    @id @default(cuid())
+  title                    String
+  pillar                   String
+  channel                  String    @default("ORGANIK") // "ORGANIK" | "IKLAN"
+  sourcePostId             String?
+  // 6 mandatory hypothesis fields — empty string blocked by zod
+  whyNeeded                String
+  signalTargeted           String
+  expectedAudienceReaction String
+  expectedBusinessOutcome  String
+  successMetric            String
+  decisionRuleAfterTest    String
+  status                   String    @default("DRAFT") // "DRAFT" | "RUNNING" | "PASSED" | "FAILED"
+  cycleStart               DateTime?
+  cycleEnd                 DateTime?
+  resultNotes              String?
+  createdAt                DateTime  @default(now())
+  isExample                Boolean   @default(false)
+  posts                    IgPost[]
+  verdicts                 Verdict[]
+}
+
+// ── Meta Ads Rescue ─────────────────────────────────────────────
+model Campaign {
+  id                   String                @id @default(cuid())
+  name                 String                @unique
+  objective            String // "CHAT_WA" | "LEAD_FORM" | "TRAFFIC" | "LAINNYA"
+  status               String                @default("AKTIF") // "AKTIF" | "PAUSED" | "SELESAI"
+  targetCpqlRibu       Int? // per-campaign override; global default in settings
+  // Phase-1 manual funnel counts — fallback until the Leads module lands.
+  // Engine uses max(linked Lead rows, these manual counts).
+  manualChats          Int                   @default(0)
+  manualQualifiedLeads Int                   @default(0)
+  manualSurveys        Int                   @default(0)
+  manualPipelineJuta   Int                   @default(0)
+  notes                String?
+  createdAt            DateTime              @default(now())
+  isExample            Boolean               @default(false)
+  adSets               AdSet[]
+  metrics              CampaignMetricDaily[]
+  leads                Lead[]
+  verdicts             Verdict[]
+}
+
+model AdSet {
+  id           String                @id @default(cuid())
+  campaignId   String
+  campaign     Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String
+  audienceDesc String?
+  status       String                @default("AKTIF")
+  metrics      CampaignMetricDaily[]
+
+  @@unique([campaignId, name])
+}
+
+model CampaignMetricDaily {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  adSetId         String?
+  adSet           AdSet?   @relation(fields: [adSetId], references: [id])
+  date            DateTime
+  spendRibu       Int // ribu rupiah
+  impressions     Int?
+  clicks          Int?
+  resultsPlatform Int? // per Ads Manager — shown as honesty check, NEVER used for verdicts
+  isExample       Boolean  @default(false)
+
+  @@unique([campaignId, adSetId, date])
+}
+
+// ── Leads (truth foundation — UI lands next phase) ──────────────
+model Lead {
+  id                 String      @id @default(cuid())
+  name               String
+  sourceType         String // "ADS" | "IG_ORGANIK" | "REFERRAL" | "LAINNYA"
+  campaignId         String?
+  campaign           Campaign?   @relation(fields: [campaignId], references: [id])
+  sourceCampaignName String?
+  igPostId           String?
+  igPost             IgPost?     @relation(fields: [igPostId], references: [id])
+  status             String      @default("CHAT_BARU")
+  signalBudget       Int         @default(0) // each 0–20
+  signalProjectType  Int         @default(0)
+  signalLocation     Int         @default(0)
+  signalUrgency      Int         @default(0)
+  signalSeriousness  Int         @default(0)
+  qualityScore       Int         @default(0) // cached sum 0–100
+  qualAnswersCount   Int         @default(0)
+  estimatedValueJuta Int         @default(0)
+  lastContactAt      DateTime?
+  createdAt          DateTime    @default(now())
+  isExample          Boolean     @default(false)
+  events             LeadEvent[]
+}
+
+model LeadEvent {
+  id         String   @id @default(cuid())
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  eventAt    DateTime @default(now())
+  type       String // "STATUS_CHANGE" | "CATATAN" | "FOLLOW_UP"
+  fromStatus String?
+  toStatus   String?
+  note       String?
+}
+
+// ── War Room ────────────────────────────────────────────────────
+model WarRoomSession {
+  id          String            @id @default(cuid())
+  weekStart   DateTime          @unique
+  metricsJson String // snapshot of the computed week-vs-week compare
+  notes       String?
+  createdAt   DateTime          @default(now())
+  isExample   Boolean           @default(false)
+  decisions   WarRoomDecision[]
+}
+
+model WarRoomDecision {
+  id          String         @id @default(cuid())
+  sessionId   String
+  session     WarRoomSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  decision    String // fixed decision vocabulary ONLY
+  subjectType String?
+  subjectId   String?
+  reason      String
+  status      String         @default("TERBUKA") // "TERBUKA" | "SELESAI" | "BATAL"
+}
+
+// ── Verdict log (QA/Truth Auditor) ──────────────────────────────
+model Verdict {
+  id           String      @id @default(cuid())
+  subjectType  String // "AKUN" | "REKOMENDASI" | "TRACKING" | "IG_POST" | "EKSPERIMEN" | "CAMPAIGN" | "DIAGNOSA"
+  subjectId    String?
+  auditRunId   String?
+  auditRun     AuditRun?   @relation(fields: [auditRunId], references: [id])
+  igPostId     String?
+  igPost       IgPost?     @relation(fields: [igPostId], references: [id])
+  experimentId String?
+  experiment   Experiment? @relation(fields: [experimentId], references: [id])
+  campaignId   String?
+  campaign     Campaign?   @relation(fields: [campaignId], references: [id])
+  decision     String // fixed vocabulary only — recordVerdict() takes the Keputusan union
+  ruleFired    String // machine key, e.g. "ADS_KILL_ZERO_QUALIFIED"
+  triggerJson  String // the numbers that fired the rule
+  confidence   String // "RENDAH" | "SEDANG" | "TINGGI"
+  lockedByGate String? // "GERBANG_0" | "GERBANG_1"
+  createdAt    DateTime    @default(now())
+  isExample    Boolean     @default(false)
+}
+
+// ── Settings ────────────────────────────────────────────────────
+model Setting {
+  key          String   @id
+  value        String
+  label        String
+  description  String?
+  defaultValue String
+  rationale    String
+  groupKey     String
+  updatedAt    DateTime @updatedAt
+}
