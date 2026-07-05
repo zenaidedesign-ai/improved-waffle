@@ -169,15 +169,38 @@ await check("eksperimen: kartu 6 kolom + cakupan pilar; library terisi", async (
   if (!body2.includes("budget bengkak")) throw new Error("pain point contoh hilang");
 });
 
-// 9f. Laporan revenue
-await check("laporan: pipeline + top priority dari data nyata", async () => {
+// 9g. Revenue War Room (laporan eksekutif) + Knowledge + Impor
+await check("revenue war room: 10 bagian, bukti angka, corong bocor", async () => {
   await page.goto(BASE + "/laporan");
   const body = await page.textContent("body");
-  if (!body.includes("Pipeline minggu ini")) throw new Error("judul pipeline hilang");
-  if (!body.includes("Top Priority")) throw new Error("top priority hilang");
-  if (!body.includes("Qualified Leads")) throw new Error("metrik utama hilang");
+  for (const s of ["Apa yang bekerja", "Apa yang gagal", "lead berkualitas", "harus dimatikan", "layak di-scale", "layak diulang", "wajib di-follow-up", "corong bocor", "Noor kerjakan", "Top 3 prioritas", "menunggu owner"]) {
+    if (!body.includes(s)) throw new Error(`bagian hilang: ${s}`);
+  }
 });
-await page.screenshot({ path: SHOTS + "/12-laporan.png", fullPage: true });
+await page.screenshot({ path: SHOTS + "/13-war-room-report.png", fullPage: true });
+
+await check("knowledge: saran dari data + simpan learning", async () => {
+  await page.goto(BASE + "/knowledge");
+  const body = await page.textContent("body");
+  if (!body.includes("Saran dari data")) throw new Error("blok saran hilang");
+  if (!body.includes("BEFORE_AFTER")) throw new Error("saran pilar (n≥2) tidak muncul dari data contoh");
+  if (!body.includes("layak diulang")) throw new Error("saran pola kampanye scale tidak muncul");
+  await page.click('button:has-text("Simpan sebagai learning")');
+  await page.waitForTimeout(2500);
+  await page.goto(BASE + "/knowledge");
+  const body2 = await page.textContent("body");
+  if (!body2.includes("Lemah (kejadian tunggal / sampel kecil) (1)") && !body2.includes("sampel kecil) (1)"))
+    throw new Error("learning tidak tersimpan sebagai LEMAH");
+});
+
+await check("impor: template unduh + ekspor CSV jalan", async () => {
+  const tpl = await page.request.get(BASE + "/api/template/ads-metric");
+  if (!(await tpl.text()).includes("kampanye,tanggal,spend_ribu")) throw new Error("template ads rusak");
+  const exp = await page.request.get(BASE + "/api/export/lead");
+  const csv = await exp.text();
+  if (!csv.includes("nama,sumber,status")) throw new Error("header ekspor lead rusak");
+  if (!csv.includes("Bu Sari")) throw new Error("data lead tidak ikut terekspor");
+});
 
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {

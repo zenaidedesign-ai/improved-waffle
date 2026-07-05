@@ -66,6 +66,7 @@ model IgPost {
   adCandidateScore     Float?
   experimentId         String?
   experiment           Experiment? @relation(fields: [experimentId], references: [id])
+  importBatchId        String?
   isExample            Boolean     @default(false)
   leads                Lead[]
   fitScores            FitScore[]
@@ -196,6 +197,7 @@ model CampaignMetricDaily {
   impressions     Int?
   clicks          Int?
   resultsPlatform Int? // per Ads Manager — shown as honesty check, NEVER used for verdicts
+  importBatchId   String?
   isExample       Boolean  @default(false)
 
   @@unique([campaignId, adSetId, date])
@@ -223,6 +225,7 @@ model Lead {
   lastContactAt      DateTime?
   surveyAt           DateTime? // jadwal survei (Survey Scheduler)
   proposalSentAt     DateTime? // kapan proposal dikirim (Proposal Tracker)
+  importBatchId      String?
   notes              String?
   createdAt          DateTime    @default(now())
   isExample          Boolean     @default(false)
@@ -343,4 +346,28 @@ model Objection {
   answer    String // jawaban terbaik versi Zenaide
   createdAt DateTime @default(now())
   isExample Boolean  @default(false)
+}
+
+// ── Marketing Knowledge Engine (Phase 11) ──
+model Learning {
+  id             String   @id @default(cuid())
+  category       String // "KONTEN" | "PENAWARAN" | "AREA" | "PROYEK" | "KEBERATAN" | "KANAL" | "KAMPANYE" | "LEAD_SIGNAL"
+  insight        String
+  supportingData String // data pendukung — WAJIB, tanpa ini cuma opini
+  sourceType     String // "DATA_INTERNAL" | "PENGETAHUAN_OWNER" | "OBSERVASI_KOMPETITOR" | "TREN_PUBLIK" | "HIPOTESIS"
+  confidence     String // "RENDAH" | "SEDANG" | "TINGGI"
+  strength       String // "TERBUKTI" | "BERKEMBANG" | "LEMAH" — TERBUKTI hanya boleh dari DATA_INTERNAL
+  recommendedAction String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  isExample      Boolean  @default(false)
+}
+
+// ── Impor CSV aman (Phase 12) — setiap impor tercatat & bisa dibatalkan ──
+model ImportBatch {
+  id        String   @id @default(cuid())
+  type      String // "IG_POST" | "LEAD" | "ADS_METRIC"
+  fileName  String?
+  rowCount  Int
+  createdAt DateTime @default(now())
 }

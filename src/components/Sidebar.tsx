@@ -21,6 +21,9 @@ const NAV = [
   { href: "/library", label: "Pain & Keberatan", icon: "📚" },
   { group: "Pasar" },
   { href: "/kompetitor", label: "Competitor Lab", icon: "🔭" },
+  { href: "/knowledge", label: "Knowledge Engine", icon: "🧠" },
+  { group: "Data" },
+  { href: "/impor", label: "Impor & Ekspor", icon: "📥" },
 ] as const;
 
 export function Sidebar() {
