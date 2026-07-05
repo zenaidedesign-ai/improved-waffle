@@ -244,6 +244,21 @@ await check("panel kebenaran data: konflik sumber tampil di dashboard & kampanye
 });
 await page.screenshot({ path: SHOTS + "/15-truth-panel.png", fullPage: true });
 
+// 9j. Pilot 14 hari — kemajuan HANYA dari data nyata
+await check("pilot: data contoh tidak dihitung, checklist & mulai pilot jalan", async () => {
+  await page.goto(BASE + "/pilot");
+  const body = await page.textContent("body");
+  // 8 lead CONTOH terpasang, tapi kriteria lead harus tetap 0/50 — bukti data contoh tidak dihitung.
+  if (!body.includes("0/50")) throw new Error("data contoh ikut terhitung sebagai kemajuan pilot (lead bukan 0/50)");
+  if (!body.includes("dinilai Noor di hari 14")) throw new Error("kriteria manual Noor hilang");
+  if (!body.includes("Rutinitas HARIAN")) throw new Error("checklist harian hilang");
+  if (!body.includes("Rutinitas MINGGUAN")) throw new Error("checklist mingguan hilang");
+  if (!body.includes("tuning ambang")) throw new Error("bagian hari 14 hilang");
+  await page.click('button:has-text("Mulai pilot hari ini")');
+  await page.waitForSelector("text=Hari ke-1", { timeout: 15000 });
+});
+await page.screenshot({ path: SHOTS + "/16-pilot.png", fullPage: true });
+
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {
   await page.goto(BASE + "/war-room");
