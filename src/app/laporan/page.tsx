@@ -4,6 +4,8 @@
 import Link from "next/link";
 import { Card, DecisionChip, PageHeader } from "@/components/ui";
 import { getDashboardData } from "@/lib/dashboard";
+import { DataTruthPanel } from "@/components/DataTruthPanel";
+import { getTruthPanelData } from "@/lib/truthPanel";
 import { currentWeekStart, getWeekMetrics, isLeadQualified, mapPostToInput } from "@/lib/data";
 import { db } from "@/lib/db";
 import {
@@ -32,13 +34,14 @@ export default async function LaporanPage() {
   const weekStart = currentWeekStart();
   const lastWeekStart = new Date(weekStart.getTime() - 7 * 24 * 3600 * 1000);
 
-  const [d, thisWeek, lastWeek, allLeads, posts, openDecisions] = await Promise.all([
+  const [d, thisWeek, lastWeek, allLeads, posts, openDecisions, truth] = await Promise.all([
     getDashboardData(),
     getWeekMetrics(weekStart),
     getWeekMetrics(lastWeekStart),
     db.lead.findMany(),
     db.igPost.findMany({ include: { leads: true } }),
     db.warRoomDecision.findMany({ where: { status: "TERBUKA" } }),
+    getTruthPanelData(),
   ]);
 
   // Corong keseluruhan (semua lead tercatat) — untuk deteksi bocor.
@@ -129,6 +132,10 @@ export default async function LaporanPage() {
           <Num label="Closing" value={formatJuta(thisWeek.closingValueJuta)} />
         </div>
       </Card>
+
+      <div className="mb-4">
+        <DataTruthPanel data={truth} />
+      </div>
 
       <Card title="1 · Apa yang bekerja minggu ini" className="mb-4">
         <ReportList items={wf.worked} tone="pos" />

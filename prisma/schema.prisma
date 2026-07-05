@@ -66,6 +66,8 @@ model IgPost {
   adCandidateScore     Float?
   experimentId         String?
   experiment           Experiment? @relation(fields: [experimentId], references: [id])
+  sourceType           String      @default("MANUAL") // lihat DATA_SOURCE di enums.ts
+  updatedAt            DateTime    @default(now()) @updatedAt
   importBatchId        String?
   isExample            Boolean     @default(false)
   leads                Lead[]
@@ -82,6 +84,8 @@ model IgAccountSnapshot {
   profileVisits        Int?
   recommendationStatus String // "LAYAK" | "ADA_KONTEN_DITANDAI" | "PELANGGARAN" | "BELUM_DICEK"
   notes                String?
+  sourceType           String   @default("MANUAL")
+  updatedAt            DateTime @default(now()) @updatedAt
   isExample            Boolean  @default(false)
 }
 
@@ -165,6 +169,7 @@ model Campaign {
   manualQualifiedLeads Int                   @default(0)
   manualSurveys        Int                   @default(0)
   manualPipelineJuta   Int                   @default(0)
+  updatedAt            DateTime              @default(now()) @updatedAt
   notes                String?
   createdAt            DateTime              @default(now())
   isExample            Boolean               @default(false)
@@ -197,6 +202,8 @@ model CampaignMetricDaily {
   impressions     Int?
   clicks          Int?
   resultsPlatform Int? // per Ads Manager — shown as honesty check, NEVER used for verdicts
+  sourceType      String   @default("MANUAL")
+  updatedAt       DateTime @default(now()) @updatedAt
   importBatchId   String?
   isExample       Boolean  @default(false)
 
@@ -225,6 +232,8 @@ model Lead {
   lastContactAt      DateTime?
   surveyAt           DateTime? // jadwal survei (Survey Scheduler)
   proposalSentAt     DateTime? // kapan proposal dikirim (Proposal Tracker)
+  sourceDataType     String      @default("MANUAL") // sumber DATA (bukan sumber lead)
+  updatedAt          DateTime    @default(now()) @updatedAt
   importBatchId      String?
   notes              String?
   createdAt          DateTime    @default(now())
@@ -367,6 +376,7 @@ model Learning {
 model ImportBatch {
   id        String   @id @default(cuid())
   type      String // "IG_POST" | "LEAD" | "ADS_METRIC"
+  origin    String   @default("CSV") // "CSV" | "GOOGLE_SHEET" | "EMAIL_REPORT" (email: disiapkan, belum aktif)
   fileName  String?
   rowCount  Int
   createdAt DateTime @default(now())

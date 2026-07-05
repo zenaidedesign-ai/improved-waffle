@@ -9,6 +9,7 @@ import { CSV_DEF, mapHeader, type CsvType } from "@/lib/csv";
 export function CsvImport() {
   const router = useRouter();
   const [type, setType] = useState<CsvType>("IG_POST");
+  const [origin, setOrigin] = useState<"CSV" | "GOOGLE_SHEET">("CSV");
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [unmapped, setUnmapped] = useState<string[]>([]);
@@ -69,6 +70,16 @@ export function CsvImport() {
         </a>
       </div>
 
+      <div className="flex items-center gap-2 text-xs">
+        <span className="font-semibold text-gray-500">Asal file:</span>
+        {(["CSV", "GOOGLE_SHEET"] as const).map((o) => (
+          <button key={o} onClick={() => setOrigin(o)}
+            className={`rounded-lg border px-2.5 py-1 font-semibold ${origin === o ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 text-gray-600"}`}>
+            {o === "CSV" ? "Ekspor resmi platform (andal 90–95%)" : "Google Sheet (andal 80–95%)"}
+          </button>
+        ))}
+      </div>
+
       <label className="block cursor-pointer rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500 hover:bg-gray-50">
         {fileName ? `File: ${fileName}` : "Klik untuk pilih file CSV (atau ekspor dari Ads Manager / template sistem)"}
         <input
@@ -122,6 +133,7 @@ export function CsvImport() {
                     type,
                     rows.filter((r) => (r[requiredFirst] ?? "").trim() !== ""),
                     fileName ?? "tanpa-nama.csv",
+                    origin,
                   );
                   setResult(res);
                   setRows([]);

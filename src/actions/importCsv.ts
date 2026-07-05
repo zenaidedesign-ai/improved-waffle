@@ -54,12 +54,14 @@ export async function importCsvRows(
   type: "IG_POST" | "LEAD" | "ADS_METRIC",
   rows: unknown[],
   fileName: string,
+  origin: "CSV" | "GOOGLE_SHEET" = "CSV",
 ): Promise<ImportResult> {
   if (rows.length === 0) throw new Error("Tidak ada baris valid untuk diimpor.");
   if (rows.length > 2000) throw new Error("Maksimal 2000 baris per impor.");
+  const sourceType = origin; // Layer A: asal data tercatat di setiap baris
 
   const batch = await db.importBatch.create({
-    data: { type, fileName, rowCount: rows.length },
+    data: { type, fileName, rowCount: rows.length, origin },
   });
   const skipped: string[] = [];
   let inserted = 0;
@@ -80,7 +82,7 @@ export async function importCsvRows(
           plays: r.plays, likes: r.likes, comments: r.komentar, saves: r.saves,
           shares: r.shares, profileVisits: r.kunjungan_profil, follows: r.follows,
           dmClicks: r.klik_dm, waClicks: r.klik_wa, leadsManual: r.leads,
-          qualifiedLeadsManual: r.leads_berkualitas, importBatchId: batch.id,
+          qualifiedLeadsManual: r.leads_berkualitas, importBatchId: batch.id, sourceType,
         },
       });
       const score = computeSignalScore(mapPostToInput({ ...created, leads: [] }));
@@ -106,6 +108,7 @@ export async function importCsvRows(
           createdAt: r.tanggal_masuk ?? new Date(),
           lastContactAt: r.tanggal_masuk ?? new Date(),
           importBatchId: batch.id,
+          sourceDataType: sourceType,
         },
       });
       inserted++;
@@ -126,7 +129,7 @@ export async function importCsvRows(
         data: {
           campaignId: campaign.id, date: r.tanggal, spendRibu: Math.round(r.spend_ribu),
           impressions: r.impresi, clicks: r.klik, resultsPlatform: r.hasil_platform,
-          importBatchId: batch.id,
+          importBatchId: batch.id, sourceType,
         },
       });
       inserted++;

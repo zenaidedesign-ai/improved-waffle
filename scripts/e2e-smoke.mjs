@@ -214,6 +214,27 @@ await check("pelatih instagram: rencana + diagnosa per post + prinsip publik", a
 });
 await page.screenshot({ path: SHOTS + "/14-coach.png", fullPage: true });
 
+// 9i. Arsitektur sumber data & kebijakan kebenaran
+await check("impor: keandalan, kamus normalisasi, status konektor, screenshot", async () => {
+  await page.goto(BASE + "/impor");
+  const body = await page.textContent("body");
+  for (const s of ["Keandalan per sumber", "Kamus normalisasi", "Status konektor", "Input dari screenshot", "OCR otomatis BELUM diaktifkan", "Google Sheet (andal 80–95%)", "TANPA mengubah logika bisnis"]) {
+    if (!body.includes(s)) throw new Error(`bagian hilang: ${s}`);
+  }
+});
+
+await check("panel kebenaran data: konflik sumber tampil di dashboard & kampanye", async () => {
+  await page.goto(BASE + "/");
+  const body = await page.textContent("body");
+  if (!body.includes("Kebenaran Data")) throw new Error("panel kebenaran hilang di dashboard");
+  if (!body.includes("Konflik data terdeteksi")) throw new Error("konflik seed (klaim Ads Manager > catatan) tidak tampil");
+  if (!body.includes("TIDAK live")) throw new Error("penegasan data tidak live hilang");
+  await page.goto(BASE + "/kampanye");
+  const body2 = await page.textContent("body");
+  if (!body2.includes("Konflik data terdeteksi")) throw new Error("konflik tidak tampil di permukaan keputusan budget");
+});
+await page.screenshot({ path: SHOTS + "/15-truth-panel.png", fullPage: true });
+
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {
   await page.goto(BASE + "/war-room");

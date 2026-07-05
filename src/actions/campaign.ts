@@ -57,12 +57,13 @@ const metricSchema = z.object({
   impressions: z.union([nonNegInt, z.literal(""), z.null(), z.undefined()]).transform((v) => (v === "" || v == null ? null : v)),
   clicks: z.union([nonNegInt, z.literal(""), z.null(), z.undefined()]).transform((v) => (v === "" || v == null ? null : v)),
   resultsPlatform: z.union([nonNegInt, z.literal(""), z.null(), z.undefined()]).transform((v) => (v === "" || v == null ? null : v)),
+  dataSource: z.enum(["MANUAL", "SCREENSHOT"]).default("MANUAL"),
 });
 
 export type MetricPayload = z.input<typeof metricSchema>;
 
 export async function addCampaignMetric(payload: unknown): Promise<void> {
-  const data = metricSchema.parse(payload);
+  const { dataSource, ...data } = metricSchema.parse(payload);
   // Upsert manual: unique gabungan berisi kolom nullable (adSetId), jadi
   // where-compound Prisma tidak bisa dipakai untuk baris level-kampanye.
   const existing = await db.campaignMetricDaily.findFirst({
@@ -71,10 +72,10 @@ export async function addCampaignMetric(payload: unknown): Promise<void> {
   if (existing) {
     await db.campaignMetricDaily.update({
       where: { id: existing.id },
-      data: { spendRibu: data.spendRibu, impressions: data.impressions, clicks: data.clicks, resultsPlatform: data.resultsPlatform },
+      data: { spendRibu: data.spendRibu, impressions: data.impressions, clicks: data.clicks, resultsPlatform: data.resultsPlatform, sourceType: dataSource },
     });
   } else {
-    await db.campaignMetricDaily.create({ data });
+    await db.campaignMetricDaily.create({ data: { ...data, sourceType: dataSource } });
   }
   revalidatePath(`/kampanye/${data.campaignId}`);
   revalidatePath("/kampanye");

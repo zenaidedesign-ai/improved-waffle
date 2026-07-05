@@ -7,6 +7,8 @@ import { AD_CHANNEL_LABEL, LAPISAN_LABEL, type AdChannel } from "@/lib/domain/en
 import { formatAngka, formatJuta, formatPct, formatRibu } from "@/lib/format";
 import { campaignHealth, compareCampaigns, computeCostChain, decideCampaign, diagnoseLayer, KESEHATAN_LABEL, type CampaignChainSummary } from "@/lib/engine/adsRescue";
 import { gateLock } from "@/lib/engine/gates";
+import { DataTruthPanel } from "@/components/DataTruthPanel";
+import { getTruthPanelData } from "@/lib/truthPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,7 @@ export default async function KampanyePage() {
     chain: computeCostChain(buildCampaignFunnel(c)),
   }));
   const moveBudget = lock.locked ? null : compareCampaigns(summaries);
+  const truth = await getTruthPanelData();
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -63,6 +66,12 @@ export default async function KampanyePage() {
       {moveBudget && (
         <div className="mb-6">
           <VerdictCard verdict={moveBudget} />
+        </div>
+      )}
+
+      {(truth.conflicts.length > 0 || truth.warnings.length > 0) && (
+        <div className="mb-6">
+          <DataTruthPanel data={truth} />
         </div>
       )}
 

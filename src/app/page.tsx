@@ -2,6 +2,8 @@ import Link from "next/link";
 import { deleteExampleData, loadExampleData } from "@/actions/seed";
 import { Card, DecisionChip, GateLockBanner, PageHeader, StatusChip, VerdictCard } from "@/components/ui";
 import { getDashboardData } from "@/lib/dashboard";
+import { DataTruthPanel } from "@/components/DataTruthPanel";
+import { getTruthPanelData } from "@/lib/truthPanel";
 import {
   AD_CHANNEL_LABEL,
   IG_FORMAT_LABEL,
@@ -15,7 +17,7 @@ import { formatAngka, formatJuta, formatRibu } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const d = await getDashboardData();
+  const [d, truth] = await Promise.all([getDashboardData(), getTruthPanelData()]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -255,6 +257,10 @@ export default async function DashboardPage() {
           </div>
         </div>
       </Card>
+
+      <div className="mb-6">
+        <DataTruthPanel data={truth} />
+      </div>
 
       {d.hasAnyData && (
         <div className="flex gap-2">

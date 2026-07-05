@@ -18,6 +18,9 @@ export const CSV_DEF: Record<
       "tanggal tayang": "tanggal",
       "comments": "komentar",
       "profile visits": "kunjungan_profil",
+      // TikTok "profile views" ≈ kunjungan profil IG — permukaan berbeda,
+      // bandingkan hanya dalam platform yang sama (catatan Layer C).
+      "profile views": "kunjungan_profil",
     },
   },
   LEAD: {
@@ -31,12 +34,26 @@ export const CSV_DEF: Record<
     headers: ["kampanye", "tanggal", "spend_ribu", "impresi", "klik", "hasil_platform"],
     example: ["[CONTOH] Promo Kitchen Set — Broad", "2026-06-25", "350", "21000", "380", "9"],
     aliases: {
+      // Meta Ads Manager
       "campaign name": "kampanye",
       "day": "tanggal",
       "amount spent (idr)": "spend_ribu",
+      "amount spent": "spend_ribu",
       "impressions": "impresi",
       "link clicks": "klik",
       "results": "hasil_platform",
+      // Google Ads — "cost" dinormalkan ke spend
+      "campaign": "kampanye",
+      "cost": "spend_ribu",
+      "cost (idr)": "spend_ribu",
+      "clicks": "klik",
+      "impr.": "impresi",
+      "conversions": "hasil_platform",
+      // TikTok Ads — "total cost" dinormalkan ke spend
+      "campaign_name": "kampanye",
+      "total cost": "spend_ribu",
+      "date": "tanggal",
+      "result": "hasil_platform",
     },
   },
 };
@@ -50,6 +67,13 @@ export function toCsv(headers: string[], rows: Array<Array<string | number | nul
 }
 
 /** Petakan header file → header kanonik (case-insensitive + alias). */
+/** Catatan normalisasi lintas platform — ditampilkan di layar Impor (Layer C). */
+export const NORMALIZATION_NOTES: Array<{ canonical: string; sources: string; note: string }> = [
+  { canonical: "spend_ribu", sources: 'Meta "Amount spent" · Google "Cost" · TikTok "Total cost"', note: "Semua dinormalkan ke ribu rupiah. Cek mata uang akun iklan sebelum impor." },
+  { canonical: "hasil_platform", sources: 'Meta "Results" · Google "Conversions" · TikTok "Result"', note: "Definisi 'hasil' BERBEDA per platform — tidak pernah dipakai untuk vonis, hanya pembanding kejujuran." },
+  { canonical: "kunjungan_profil", sources: 'IG "Profile visits" · TikTok "Profile views"', note: "Permukaan berbeda; bandingkan hanya di dalam platform yang sama." },
+];
+
 export function mapHeader(raw: string, type: CsvType): string | null {
   const low = raw.trim().toLowerCase();
   const def = CSV_DEF[type];

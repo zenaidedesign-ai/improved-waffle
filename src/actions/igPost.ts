@@ -31,14 +31,15 @@ const postSchema = z.object({
   waClicks: optionalInt,
   leadsManual: optionalInt,
   qualifiedLeadsManual: optionalInt,
+  dataSource: z.enum(["MANUAL", "SCREENSHOT"]).default("MANUAL"),
 });
 
 export type IgPostPayload = z.input<typeof postSchema>;
 
 export async function createIgPost(payload: unknown): Promise<{ ok: true }> {
-  const data = postSchema.parse(payload);
+  const { dataSource, ...data } = postSchema.parse(payload);
   const created = await db.igPost.create({
-    data: { ...data, caption: data.caption || null, cta: data.cta || null },
+    data: { ...data, caption: data.caption || null, cta: data.cta || null, sourceType: dataSource },
   });
   const score = computeSignalScore(mapPostToInput({ ...created, leads: [] }));
   if (score !== null) {
@@ -59,17 +60,18 @@ const snapshotSchema = z.object({
   profileVisits: optionalInt,
   recommendationStatus: z.enum(["LAYAK", "ADA_KONTEN_DITANDAI", "PELANGGARAN", "BELUM_DICEK"]),
   notes: z.string().max(2000).optional(),
+  dataSource: z.enum(["MANUAL", "SCREENSHOT"]).default("MANUAL"),
 });
 
 export type SnapshotPayload = z.input<typeof snapshotSchema>;
 
 export async function upsertSnapshot(payload: unknown): Promise<void> {
-  const data = snapshotSchema.parse(payload);
-  const { weekStart, ...rest } = data;
+  const parsed = snapshotSchema.parse(payload);
+  const { weekStart, dataSource, ...rest } = parsed;
   await db.igAccountSnapshot.upsert({
     where: { weekStart },
-    update: { ...rest, notes: rest.notes || null },
-    create: { weekStart, ...rest, notes: rest.notes || null },
+    update: { ...rest, notes: rest.notes || null, sourceType: dataSource },
+    create: { weekStart, ...rest, notes: rest.notes || null, sourceType: dataSource },
   });
   revalidatePath("/instagram");
 }
