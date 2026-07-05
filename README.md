@@ -6,14 +6,22 @@ Tujuan bisnis: menghasilkan lead interior berkualitas → percakapan WhatsApp �
 
 ## Status
 
-**Fase 1 terbangun** — Instagram & Meta Recovery Engine versi input manual (tanpa API eksternal):
-tiga audit gerbang (Akun Meta, Kelayakan Rekomendasi, Tracking), Diagnosa Distribusi Instagram,
-Algorithm Fit Score, Meta Ads Rescue dengan mesin vonis, dan War Room Mingguan.
+**Terbangun & teruji (semua input manual/CSV/screenshot — TANPA API live):** tiga audit gerbang,
+Diagnosa Distribusi Instagram + Pelatih Instagram, Algorithm Fit Score, Eksperimen 30 Hari +
+perpustakaan pain/keberatan, Lead Intelligence (triase deterministik), Ads Intelligence
+multi-kanal dengan mesin vonis, Competitor Lab (observasi publik manual), Knowledge Engine,
+Dashboard Intelijen, Revenue War Room mingguan, dan lapisan Kebenaran Data (sumber, keandalan,
+kebasian, konflik). **Belum dibangun:** Threads Intelligence, Local Search, fitur generator/asisten
+(menunggu keputusan LLM), integrasi API resmi apa pun.
 
-Dokumen desain:
+Dokumen:
 
 - 📄 [`docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md`](docs/BLUEPRINT-GOAL-1-INSTAGRAM-META-RECOVERY.md)
 - 📄 [`docs/PLAN-GOAL-1-IMPLEMENTATION.md`](docs/PLAN-GOAL-1-IMPLEMENTATION.md)
+- 📄 [`docs/DATA-ARCHITECTURE.md`](docs/DATA-ARCHITECTURE.md) · [`docs/API-READINESS.md`](docs/API-READINESS.md)
+
+**Catatan keamanan:** aplikasi ini single-user TANPA login — jalankan hanya di perangkat/jaringan
+yang dipercaya. Basis data = satu file SQLite (`prisma/dev.db`); cadangkan lewat Ekspor CSV.
 
 ## Menjalankan
 

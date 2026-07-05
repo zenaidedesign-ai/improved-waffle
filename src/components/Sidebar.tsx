@@ -58,8 +58,8 @@ export function Sidebar() {
         )}
       </nav>
       <div className="border-t border-gray-200 p-3 text-[10px] leading-relaxed text-gray-400">
-        Fase 1 — input manual & data contoh. Tanpa API eksternal. Metrik utama: lead berkualitas,
-        survei, proposal, nilai pipeline.
+        Semua data: manual / CSV / screenshot — TANPA API live. Metrik utama: lead berkualitas,
+        survei, proposal, closing, pipeline.
       </div>
     </aside>
   );

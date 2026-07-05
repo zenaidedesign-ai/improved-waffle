@@ -111,9 +111,9 @@ export default async function WarRoomPage() {
 
       <Card title="Eksperimen konten" className="mb-6">
         <p className="text-sm text-gray-500">
-          Papan eksperimen 30 hari (kartu hipotesis 6 kolom wajib) hadir di fase berikutnya. Sampai
-          saat itu, gunakan keputusan “uji hipotesis” di bawah dengan alasan yang menyebut sinyal
-          yang dibidik dan metrik suksesnya.
+          Papan eksperimen 30 hari sudah aktif di menu <b>Eksperimen 30 Hari</b> — kartu yang jatuh
+          tempo evaluasinya tampil di sana. Keputusan war room yang menyangkut konten sebaiknya
+          merujuk kartu eksperimen, bukan perasaan.
         </p>
       </Card>
 
