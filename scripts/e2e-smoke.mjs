@@ -202,6 +202,18 @@ await check("impor: template unduh + ekspor CSV jalan", async () => {
   if (!csv.includes("Bu Sari")) throw new Error("data lead tidak ikut terekspor");
 });
 
+// 9h. Pelatih Instagram
+await check("pelatih instagram: rencana + diagnosa per post + prinsip publik", async () => {
+  await page.goto(BASE + "/instagram/coach");
+  const body = await page.textContent("body");
+  if (!body.includes("Rencana pelatih minggu ini")) throw new Error("rencana pelatih hilang");
+  if (!body.includes("Tolok ukur akun")) throw new Error("tolok ukur akun hilang");
+  if (!body.includes("median akun")) throw new Error("diagnosa per post tanpa pembanding median");
+  if (!body.includes("Mosseri")) throw new Error("prinsip publik bersumber hilang");
+  if (!body.includes("bukan angka ajaib industri")) throw new Error("catatan kejujuran tolok ukur hilang");
+});
+await page.screenshot({ path: SHOTS + "/14-coach.png", fullPage: true });
+
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {
   await page.goto(BASE + "/war-room");

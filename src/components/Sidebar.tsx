@@ -11,6 +11,7 @@ const NAV = [
   { href: "/audit/rekomendasi", label: "Audit Rekomendasi", icon: "📡" },
   { href: "/audit/tracking", label: "Audit Tracking", icon: "🎯" },
   { href: "/instagram", label: "Diagnosa Instagram", icon: "📈" },
+  { href: "/instagram/coach", label: "Pelatih Instagram", icon: "🏋️" },
   { group: "Revenue" },
   { href: "/leads", label: "Lead Intelligence", icon: "🤝" },
   { href: "/kampanye", label: "Ads Intelligence", icon: "🚑" },
