@@ -98,6 +98,15 @@ export const REKOMENDASI_STATUS = [
 export type RekomendasiStatus = (typeof REKOMENDASI_STATUS)[number];
 
 // ── Kampanye ──
+export const AD_CHANNEL = ["META", "GOOGLE", "TIKTOK", "THREADS"] as const;
+export type AdChannel = (typeof AD_CHANNEL)[number];
+export const AD_CHANNEL_LABEL: Record<AdChannel, string> = {
+  META: "Meta Ads",
+  GOOGLE: "Google Ads",
+  TIKTOK: "TikTok Ads",
+  THREADS: "Threads Placement",
+};
+
 export const CAMPAIGN_OBJECTIVE = ["CHAT_WA", "LEAD_FORM", "TRAFFIC", "LAINNYA"] as const;
 export type CampaignObjective = (typeof CAMPAIGN_OBJECTIVE)[number];
 export const CAMPAIGN_OBJECTIVE_LABEL: Record<CampaignObjective, string> = {

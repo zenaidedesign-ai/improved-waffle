@@ -32,6 +32,19 @@ export const DEFAULT_FIT_WEIGHTS: FitWeights = {
   businessValue: 10,
 };
 
+/** Bobot skor sinyal per post — heuristik yang BISA disetel, bukan klaim algoritma.
+ *  Alasan bobot: sinyal niat (save/share) dan jembatan bisnis (klik WA, kunjungan
+ *  profil) diberi bobot terbesar karena paling dekat ke chat & proyek; lead
+ *  berkualitas adalah sinyal bisnis nyata sehingga bonusnya paling besar. */
+export const SIGNAL_WEIGHTS = {
+  saveRatePer100Reach: 8,
+  shareRatePer100Reach: 10,
+  profileVisitRatePer100Reach: 5,
+  waClickRatePer100Reach: 12,
+  nonFollowerPct: 0.3,
+  perQualifiedLead: 15,
+} as const;
+
 export const CONFIG = {
   /** Minimal post sebelum deteksi pemenang organik & analisis campuran konten.
    *  Alasan: di bawah 8 post, persentil ke-80 hanya 1–2 post dan menyesatkan. */
@@ -74,6 +87,14 @@ export const CONFIG = {
 
   /** Maks keputusan per sesi War Room. Alasan: > 5 keputusan = tidak ada yang jalan. */
   warRoomMaxDecisions: 5,
+
+  /** Pindah budget: kampanye terbaik CPQL ≤ target DAN terburuk ≥ 2× targetnya.
+   *  Alasan: selisih < 2× masih bisa noise; ≥ 2× adalah perbedaan nyata. */
+  adsMoveBudgetWorstMultiple: 2,
+
+  /** Minimal post per format sebelum format boleh disebut "terbaik".
+   *  Alasan: 1 post bagus bukan bukti format bagus. */
+  bestFormatMinPosts: 3,
 } as const;
 
 export type EngineConfig = typeof CONFIG;

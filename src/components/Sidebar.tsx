@@ -4,15 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/", label: "Ruang Kendali", icon: "🎛️" },
+  { href: "/", label: "Dashboard", icon: "🎛️" },
+  { href: "/laporan", label: "Laporan Revenue", icon: "📑" },
   { group: "Instagram & Meta Recovery" },
   { href: "/audit/meta-account", label: "Audit Akun Meta", icon: "🩺" },
   { href: "/audit/rekomendasi", label: "Audit Rekomendasi", icon: "📡" },
   { href: "/audit/tracking", label: "Audit Tracking", icon: "🎯" },
   { href: "/instagram", label: "Diagnosa Instagram", icon: "📈" },
-  { href: "/skor", label: "Algorithm Fit Score", icon: "🧮" },
-  { href: "/kampanye", label: "Meta Ads Rescue", icon: "🚑" },
+  { group: "Revenue" },
+  { href: "/leads", label: "Lead Intelligence", icon: "🤝" },
+  { href: "/kampanye", label: "Ads Intelligence", icon: "🚑" },
   { href: "/war-room", label: "War Room Mingguan", icon: "🧭" },
+  { group: "Konten" },
+  { href: "/skor", label: "Algorithm Fit Score", icon: "🧮" },
+  { href: "/eksperimen", label: "Eksperimen 30 Hari", icon: "🧪" },
+  { href: "/library", label: "Pain & Keberatan", icon: "📚" },
+  { group: "Pasar" },
+  { href: "/kompetitor", label: "Competitor Lab", icon: "🔭" },
 ] as const;
 
 export function Sidebar() {

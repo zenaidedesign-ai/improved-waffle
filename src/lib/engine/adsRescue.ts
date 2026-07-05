@@ -104,6 +104,84 @@ export function diagnoseLayer(
   return { layer: "TIDAK_ADA", explanation: "Tidak ada lapisan masalah dominan yang terdeteksi." };
 }
 
+// ── Status kesehatan kampanye (4 tingkat) ───────────────────────
+export type KesehatanKampanye = "SEHAT" | "LEMAH" | "RUSAK" | "BELUM_CUKUP_DATA";
+
+export const KESEHATAN_LABEL: Record<KesehatanKampanye, string> = {
+  SEHAT: "Sehat",
+  LEMAH: "Lemah",
+  RUSAK: "Rusak",
+  BELUM_CUKUP_DATA: "Belum cukup data",
+};
+
+/** Peta vonis → status kesehatan. Deterministik, bukan penilaian terpisah. */
+export function campaignHealth(verdict: VerdictProposal): KesehatanKampanye {
+  switch (verdict.decision) {
+    case "TAHAN_DATA_BELUM_CUKUP":
+      return "BELUM_CUKUP_DATA";
+    case "KILL_KAMPANYE":
+    case "PERBAIKI_AKUN_DULU":
+    case "PERBAIKI_TRACKING_DULU":
+      return "RUSAK";
+    case "SCALE_KAMPANYE":
+    case "LANJUT":
+      return "SEHAT";
+    default:
+      // hold, iterate, perbaiki kreatif, ganti penawaran/audiens/CTA, pindah budget
+      return "LEMAH";
+  }
+}
+
+export interface CampaignChainSummary {
+  id: string;
+  name: string;
+  status: string;
+  targetCpqlRibu: number;
+  chain: CostChain;
+}
+
+/**
+ * Perbandingan antar-kampanye → usulan PINDAH_BUDGET.
+ * Syarat: ≥ 2 kampanye AKTIF yang datanya cukup; yang terbaik CPQL ≤ target
+ * dan yang terburuk CPQL ≥ 2× targetnya (atau nol lead berkualitas).
+ */
+export function compareCampaigns(items: CampaignChainSummary[]): VerdictProposal | null {
+  const eligible = items.filter(
+    (i) => i.status === "AKTIF" && dataSufficientForVerdict(i.chain, i.targetCpqlRibu),
+  );
+  if (eligible.length < 2) return null;
+
+  const withCpql = eligible.filter((i) => i.chain.cpqlRibu !== null);
+  const best = [...withCpql].sort((a, b) => a.chain.cpqlRibu! - b.chain.cpqlRibu!)[0];
+  if (!best || best.chain.cpqlRibu! > best.targetCpqlRibu) return null;
+
+  const worst = eligible
+    .filter(
+      (i) =>
+        i.id !== best.id &&
+        (i.chain.cpqlRibu === null || // spend cukup, nol lead berkualitas
+          i.chain.cpqlRibu >= CONFIG.adsMoveBudgetWorstMultiple * i.targetCpqlRibu),
+    )
+    .sort(
+      (a, b) =>
+        (b.chain.cpqlRibu ?? Number.MAX_SAFE_INTEGER) - (a.chain.cpqlRibu ?? Number.MAX_SAFE_INTEGER),
+    )[0];
+  if (!worst) return null;
+
+  return {
+    decision: "PINDAH_BUDGET",
+    ruleFired: "ADS_MOVE_BUDGET_BEST_WORST",
+    trigger: {
+      dari: worst.name,
+      cpqlTerburukRibu: worst.chain.cpqlRibu ?? "tanpa lead berkualitas",
+      ke: best.name,
+      cpqlTerbaikRibu: best.chain.cpqlRibu!,
+    },
+    confidence: "SEDANG",
+    explanation: `Pindahkan budget dari "${worst.name}" (CPQL ${worst.chain.cpqlRibu != null ? `Rp ${worst.chain.cpqlRibu} rb` : "— nol lead berkualitas"}) ke "${best.name}" (CPQL Rp ${best.chain.cpqlRibu} rb ≤ target). Pindahkan bertahap +${CONFIG.adsScaleStepPct}%, jangan sekaligus.`,
+  };
+}
+
 /** Vonis kampanye. Wajib melewati gateLock; data tipis ⇒ TAHAN. */
 export function decideCampaign(
   chain: CostChain,

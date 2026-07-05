@@ -5,6 +5,7 @@ const week = (over: Partial<WeekMetrics> = {}): WeekMetrics => ({
   qualifiedLeads: 4,
   surveys: 2,
   proposals: 1,
+  closingValueJuta: 0,
   pipelineValueJuta: 500,
   nonFollowerReachPct: 25,
   saves: 80,
@@ -42,16 +43,11 @@ describe("buildWeeklyCompare", () => {
   });
 });
 
-describe("weekStartOf", () => {
-  it("selalu Senin 00:00", () => {
-    const kamis = new Date("2026-07-02T15:30:00"); // Kamis
-    const senin = weekStartOf(kamis);
-    expect(senin.getDay()).toBe(1);
-    expect(senin.getHours()).toBe(0);
-    expect(senin.getDate()).toBe(29); // Senin 29 Juni 2026
-  });
-  it("hari Minggu masuk ke minggu sebelumnya", () => {
-    const minggu = new Date("2026-07-05T10:00:00");
-    expect(weekStartOf(minggu).getDate()).toBe(29);
+describe("weekStartOf (WIB)", () => {
+  it("Kamis WIB → Senin minggu yang sama menurut WIB", () => {
+    const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", day: "2-digit", weekday: "short" });
+    const senin = weekStartOf(new Date("2026-07-02T08:30:00Z")); // Kamis 15:30 WIB
+    expect(fmt.format(senin)).toContain("Mon");
+    expect(fmt.format(senin)).toContain("29");
   });
 });

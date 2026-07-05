@@ -113,15 +113,73 @@ export function buildSeed(now: Date) {
     },
   ];
 
-  // Lead contoh minggu ini & minggu lalu — supaya War Room punya pembanding.
+  // Lead contoh — meliputi hot, urgen (senyap), proposal macet, closing menang,
+  // ghosting, dan penanya harga; supaya triase & dashboard terlihat bekerja.
   const leads = [
-    { name: "[CONTOH] Bu Sari — 2BR Pakuwon", sourceType: "ADS", status: "SURVEI_TERJADWAL", signalBudget: 18, signalProjectType: 16, signalLocation: 20, signalUrgency: 14, signalSeriousness: 16, qualAnswersCount: 5, estimatedValueJuta: 280, createdAt: d(2) },
-    { name: "[CONTOH] Pak Hendra — ruko kantor", sourceType: "IG_ORGANIK", status: "BERKUALITAS", signalBudget: 14, signalProjectType: 18, signalLocation: 16, signalUrgency: 12, signalSeriousness: 14, qualAnswersCount: 4, estimatedValueJuta: 350, createdAt: d(3) },
-    { name: "[CONTOH] Mbak Dina — tanya harga", sourceType: "ADS", status: "GHOSTING", signalBudget: 4, signalProjectType: 6, signalLocation: 12, signalUrgency: 2, signalSeriousness: 2, qualAnswersCount: 1, estimatedValueJuta: 0, createdAt: d(4) },
-    { name: "[CONTOH] Pak Budi — kitchen set", sourceType: "ADS", status: "MERESPONS", signalBudget: 8, signalProjectType: 8, signalLocation: 14, signalUrgency: 6, signalSeriousness: 8, qualAnswersCount: 2, estimatedValueJuta: 45, createdAt: d(5) },
-    { name: "[CONTOH] Bu Lina — rumah full interior", sourceType: "IG_ORGANIK", status: "PROPOSAL_TERKIRIM", signalBudget: 20, signalProjectType: 20, signalLocation: 18, signalUrgency: 16, signalSeriousness: 18, qualAnswersCount: 6, estimatedValueJuta: 650, createdAt: d(9) },
-    { name: "[CONTOH] Pak Agus — apartemen studio", sourceType: "ADS", status: "SURVEI_SELESAI", signalBudget: 12, signalProjectType: 12, signalLocation: 20, signalUrgency: 14, signalSeriousness: 12, qualAnswersCount: 4, estimatedValueJuta: 120, createdAt: d(10) },
-    { name: "[CONTOH] Mas Rio — tanya-tanya", sourceType: "LAINNYA", status: "CHAT_BARU", signalBudget: 2, signalProjectType: 4, signalLocation: 8, signalUrgency: 2, signalSeriousness: 4, qualAnswersCount: 0, estimatedValueJuta: 0, createdAt: d(11) },
+    { name: "[CONTOH] Bu Sari — 2BR Pakuwon", sourceType: "ADS", status: "SURVEI_TERJADWAL", signalBudget: 18, signalProjectType: 16, signalLocation: 20, signalUrgency: 14, signalSeriousness: 16, qualAnswersCount: 5, estimatedValueJuta: 280, createdAt: d(2), lastContactAt: d(0), surveyAt: new Date(now.getTime() + 30 * 3600 * 1000) },
+    { name: "[CONTOH] Pak Hendra — ruko kantor", sourceType: "IG_ORGANIK", status: "BERKUALITAS", signalBudget: 14, signalProjectType: 18, signalLocation: 16, signalUrgency: 12, signalSeriousness: 14, qualAnswersCount: 4, estimatedValueJuta: 350, createdAt: d(6), lastContactAt: d(3) },
+    { name: "[CONTOH] Mbak Dina — tanya harga", sourceType: "ADS", status: "GHOSTING", signalBudget: 4, signalProjectType: 6, signalLocation: 12, signalUrgency: 2, signalSeriousness: 2, qualAnswersCount: 1, estimatedValueJuta: 0, createdAt: d(4), lastContactAt: d(4) },
+    { name: "[CONTOH] Pak Budi — kitchen set", sourceType: "ADS", status: "MERESPONS", signalBudget: 8, signalProjectType: 8, signalLocation: 14, signalUrgency: 6, signalSeriousness: 8, qualAnswersCount: 2, estimatedValueJuta: 45, createdAt: d(5), lastContactAt: d(2) },
+    { name: "[CONTOH] Bu Lina — rumah full interior", sourceType: "IG_ORGANIK", status: "PROPOSAL_TERKIRIM", signalBudget: 20, signalProjectType: 20, signalLocation: 18, signalUrgency: 16, signalSeriousness: 18, qualAnswersCount: 6, estimatedValueJuta: 650, createdAt: d(9), lastContactAt: d(4), proposalSentAt: d(5) },
+    { name: "[CONTOH] Pak Agus — apartemen studio", sourceType: "ADS", status: "SURVEI_SELESAI", signalBudget: 12, signalProjectType: 12, signalLocation: 20, signalUrgency: 14, signalSeriousness: 12, qualAnswersCount: 4, estimatedValueJuta: 120, createdAt: d(10), lastContactAt: d(1) },
+    { name: "[CONTOH] Mas Rio — tanya-tanya", sourceType: "LAINNYA", status: "CHAT_BARU", signalBudget: 2, signalProjectType: 4, signalLocation: 8, signalUrgency: 2, signalSeriousness: 4, qualAnswersCount: 0, estimatedValueJuta: 0, createdAt: d(11), lastContactAt: d(11) },
+    { name: "[CONTOH] Pak Tono — kantor closing", sourceType: "REFERRAL", status: "CLOSING_MENANG", signalBudget: 20, signalProjectType: 18, signalLocation: 18, signalUrgency: 16, signalSeriousness: 18, qualAnswersCount: 6, estimatedValueJuta: 380, createdAt: d(12), lastContactAt: d(1) },
+  ];
+
+  const competitor = {
+    name: "[CONTOH] Studio Interior X Surabaya",
+    igUrl: "https://instagram.com/contoh-kompetitor",
+    websiteUrl: "https://contoh-kompetitor.example",
+    analysis: {
+      positioning: "Interior 'premium terjangkau' — bahasa premium, harga menengah.",
+      offer: "Promo free konsultasi + diskon kitchen set tiap akhir bulan.",
+      cta: "Semua post mengarah ke DM, bukan WA — respons lambat jadi celah.",
+      visualStyle: "Terang, banyak teks di gambar, watermark besar.",
+      contentPattern: "80% foto hasil akhir; hampir tidak ada konten proses atau edukasi.",
+      postingFrequency: "±5 post/minggu, mayoritas foto tunggal.",
+      hookPattern: "'Bikin rumah impianmu jadi nyata' — generik, jarang menyentuh masalah.",
+      marketGap: "Tidak ada yang mengedukasi budget secara jujur; tidak ada founder POV.",
+      adaptationIdeas: "Zenaide ambil posisi edukasi budget jujur + proses transparan (angle yang mereka kosongkan). JANGAN meniru promo diskon — merusak positioning premium.",
+    },
+  };
+
+  const painPoints = [
+    { text: "[CONTOH] Takut budget bengkak di tengah proyek", audience: "Pasangan muda", source: "Chat WA" },
+    { text: "[CONTOH] Renovasi molor berbulan-bulan, tukang hilang", audience: "Pemilik rumah kedua", source: "Survei" },
+    { text: "[CONTOH] Bingung mulai dari mana setelah serah terima", audience: "Pembeli apartemen baru", source: "Komentar IG" },
+  ];
+  const objections = [
+    { text: "[CONTOH] Mahal banget dibanding panggil tukang langsung", answer: "Bandingkan total biaya + risiko bongkar ulang: tukang tanpa desain sering 2x kerja. Kami kunci RAB di depan." },
+    { text: "[CONTOH] Takut hasilnya beda dari desain 3D", answer: "Tunjukkan foto proyek: 3D vs hasil nyata berdampingan + garansi revisi terpasang." },
+  ];
+
+  const experiments = [
+    {
+      title: "[CONTOH] Reels edukasi budget: 'Interior 2BR mulai dari berapa?'",
+      pillar: "BUDGET_EDUKASI",
+      channel: "ORGANIK",
+      whyNeeded: "67% konten portofolio; non-follower tidak punya alasan peduli. Edukasi budget terbukti save+share tertinggi.",
+      signalTargeted: "Save rate & share rate, lalu reach non-follower.",
+      expectedAudienceReaction: "Disimpan sebagai referensi & dikirim ke pasangan.",
+      expectedBusinessOutcome: "Chat WA bertanya estimasi untuk unit sendiri.",
+      successMetric: "≥ 200 saves & ≥ 2 chat per post, dari 3 post uji dalam 14 hari.",
+      decisionRuleAfterTest: "Lolos → pilar rutin mingguan + kandidat iklan. Gagal → ganti angle angka (per m² vs per ruangan), bukan ganti pilar.",
+      status: "RUNNING",
+      cycleStart: d(10),
+      cycleEnd: new Date(now.getTime() + 20 * 24 * 3600 * 1000),
+    },
+    {
+      title: "[CONTOH] Founder POV: kenapa kami tolak proyek tanpa RAB jelas",
+      pillar: "FOUNDER_POV",
+      channel: "ORGANIK",
+      whyNeeded: "Belum ada wajah/opini di akun — kepercayaan premium butuh manusia, bukan katalog.",
+      signalTargeted: "Kunjungan profil & follows dari non-follower.",
+      expectedAudienceReaction: "Komentar setuju/tidak setuju — perdebatan sehat menaikkan distribusi.",
+      expectedBusinessOutcome: "Lead yang datang sudah percaya cara kerja Zenaide (kualifikasi lebih cepat).",
+      successMetric: "Rasio kunjungan profil→follow naik di 2 dari 3 post uji dalam 14 hari.",
+      decisionRuleAfterTest: "Lolos → founder POV 1x/minggu. Gagal → uji format (talking head vs teks) sebelum menyerah pada pilar.",
+      status: "DRAFT",
+    },
   ];
 
   return {
@@ -132,6 +190,10 @@ export function buildSeed(now: Date) {
     snapshots,
     campaigns,
     leads,
+    competitor,
+    painPoints,
+    objections,
+    experiments,
     auditDates: { meta: d(8), rekomendasi: d(8, 11), tracking: d(8, 12) },
   };
 }

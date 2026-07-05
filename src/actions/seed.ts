@@ -75,6 +75,14 @@ export async function loadExampleData(): Promise<void> {
     await db.lead.create({ data: { ...l, qualityScore, isExample: true } });
   }
 
+  const { analysis, ...comp } = seed.competitor;
+  await db.competitor.create({
+    data: { ...comp, isExample: true, analyses: { create: { ...analysis, isExample: true } } },
+  });
+  for (const pp of seed.painPoints) await db.painPoint.create({ data: { ...pp, isExample: true } });
+  for (const ob of seed.objections) await db.objection.create({ data: { ...ob, isExample: true } });
+  for (const ex of seed.experiments) await db.experiment.create({ data: { ...ex, isExample: true } });
+
   revalidatePath("/", "layout");
 }
 
@@ -89,6 +97,9 @@ export async function deleteExampleData(): Promise<void> {
   await db.igPost.deleteMany({ where: { isExample: true } });
   await db.igAccountSnapshot.deleteMany({ where: { isExample: true } });
   await db.experiment.deleteMany({ where: { isExample: true } });
+  await db.competitor.deleteMany({ where: { isExample: true } }); // cascade: analyses
+  await db.painPoint.deleteMany({ where: { isExample: true } });
+  await db.objection.deleteMany({ where: { isExample: true } });
   await db.auditRun.deleteMany({ where: { isExample: true } }); // cascade: answers
   revalidatePath("/", "layout");
 }

@@ -1,0 +1,312 @@
+// Perakit Dashboard Intelijen Pemasaran — menjawab 8 pertanyaan eksekutif
+// dari data nyata. Semua logika keputusan ada di engine; file ini hanya
+// mengambil, memetakan, dan merakit.
+
+import { buildCampaignFunnel, getGateStatus, isLeadQualified, mapPostToInput } from "./data";
+import { db } from "./db";
+import { CONFIG } from "./domain/config";
+import type { StatusLampu } from "./domain/enums";
+import {
+  campaignHealth,
+  compareCampaigns,
+  computeCostChain,
+  decideCampaign,
+  type CampaignChainSummary,
+  type KesehatanKampanye,
+} from "./engine/adsRescue";
+import { gateLock, type GateLockResult } from "./engine/gates";
+import {
+  bestFormat,
+  contentMixAnalysis,
+  detectOrganicWinners,
+  nonFollowerTrend,
+  type BestFormatResult,
+  type TrendResult,
+} from "./engine/igDiagnosis";
+import { followUpQueue, type FollowUpItem } from "./engine/leadTriage";
+import { buildTop5, type PriorityItem } from "./engine/priorities";
+import type { VerdictProposal } from "./engine/types";
+import { decideContentMix, decideIgWinner } from "./engine/verdicts";
+import { weekStartOf } from "./engine/warRoom";
+
+export interface CampaignRow {
+  id: string;
+  name: string;
+  channel: string;
+  status: string;
+  spendRibu: number;
+  cpqlRibu: number | null;
+  qualifiedLeads: number;
+  health: KesehatanKampanye;
+  verdict: VerdictProposal;
+}
+
+export interface DashboardData {
+  // Metrik utama (bulan berjalan)
+  primary: {
+    qualifiedLeads: number;
+    surveys: number;
+    proposals: number;
+    closingValueJuta: number;
+    pipelineValueJuta: number;
+    cpqlRibu: number | null; // spend iklan bulan ini / lead berkualitas dari iklan
+  };
+  // Q1 & Q2
+  gates: { gate0: StatusLampu | null; gate1: StatusLampu | null };
+  lock: GateLockResult;
+  igHealth: {
+    status: StatusLampu | null;
+    trend: TrendResult;
+    lastNonFollowerPct: number | null;
+    summary: string;
+  };
+  adsHealth: { status: StatusLampu | null; summary: string };
+  // Q3
+  pipelineByStatus: Array<{ status: string; count: number; valueJuta: number }>;
+  // Q4
+  wastingCampaigns: CampaignRow[];
+  moveBudget: VerdictProposal | null;
+  allCampaigns: CampaignRow[];
+  // Q5
+  winners: Array<{ postId: string; hook: string; verdict: VerdictProposal }>;
+  winnersInsufficient: boolean;
+  // Q6
+  bestFormat: BestFormatResult;
+  // Q7
+  followUps: FollowUpItem[];
+  // Q8
+  top5: PriorityItem[];
+  // Sekunder (sengaja di bawah)
+  secondary: { reach30d: number | null; followers: number | null; impressions30d: number | null };
+  hasAnyData: boolean;
+}
+
+const ACTIVE_STATUSES = [
+  "CHAT_BARU",
+  "MERESPONS",
+  "BERKUALITAS",
+  "SURVEI_TERJADWAL",
+  "SURVEI_SELESAI",
+  "PROPOSAL_TERKIRIM",
+  "NEGOSIASI",
+];
+
+export async function getDashboardData(now = new Date()): Promise<DashboardData> {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const d30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+
+  const [gates, leadsMonth, allLeads, posts, snapshots, campaigns, openDecisions, postCount] =
+    await Promise.all([
+      getGateStatus(),
+      db.lead.findMany({ where: { createdAt: { gte: monthStart } } }),
+      db.lead.findMany(),
+      db.igPost.findMany({ orderBy: { postedAt: "desc" }, include: { leads: true } }),
+      db.igAccountSnapshot.findMany({ orderBy: { weekStart: "desc" }, take: 12 }),
+      db.campaign.findMany({ include: { metrics: true, leads: true } }),
+      db.warRoomDecision.findMany({ where: { status: "TERBUKA" }, take: 10 }),
+      db.igPost.count(),
+    ]);
+
+  const lock = gateLock(gates.gate0, gates.gate1);
+  const inputs = posts.map(mapPostToInput);
+
+  // ── Metrik utama (bulan berjalan) ──
+  const monthSpendRibu = campaigns
+    .flatMap((c) => c.metrics)
+    .filter((m) => m.date >= monthStart)
+    .reduce((s, m) => s + m.spendRibu, 0);
+  const adsQualifiedMonth = leadsMonth.filter((l) => l.sourceType === "ADS" && isLeadQualified(l)).length;
+
+  const primary = {
+    qualifiedLeads: leadsMonth.filter(isLeadQualified).length,
+    surveys: leadsMonth.filter((l) =>
+      ["SURVEI_TERJADWAL", "SURVEI_SELESAI", "PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status),
+    ).length,
+    proposals: leadsMonth.filter((l) =>
+      ["PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status),
+    ).length,
+    closingValueJuta: leadsMonth
+      .filter((l) => l.status === "CLOSING_MENANG")
+      .reduce((s, l) => s + l.estimatedValueJuta, 0),
+    pipelineValueJuta: allLeads
+      .filter((l) => ACTIVE_STATUSES.includes(l.status))
+      .reduce((s, l) => s + l.estimatedValueJuta, 0),
+    cpqlRibu:
+      monthSpendRibu > 0 && adsQualifiedMonth > 0
+        ? Math.round(monthSpendRibu / adsQualifiedMonth)
+        : null,
+  };
+
+  // ── Q1: Instagram sehat? ──
+  const trend = nonFollowerTrend(
+    snapshots
+      .filter((s) => s.reachNonFollowerPct != null)
+      .map((s) => ({ date: s.weekStart, pct: s.reachNonFollowerPct! })),
+  );
+  const lastNonFollowerPct = snapshots[0]?.reachNonFollowerPct ?? null;
+  const igStatus: StatusLampu | null =
+    gates.gate0 === null
+      ? null
+      : gates.gate0 === "MERAH"
+        ? "MERAH"
+        : trend.direction === "TURUN"
+          ? "KUNING"
+          : gates.gate0;
+  const igSummary =
+    gates.gate0 === null
+      ? "Belum diaudit — jalankan Audit Akun Meta & Kelayakan Rekomendasi."
+      : gates.gate0 === "MERAH"
+        ? "Fondasi akun bermasalah — lihat rencana perbaikan di audit."
+        : trend.direction === "TURUN"
+          ? `Akun lolos audit tapi reach non-follower TURUN ${trend.slopePctPerWeek} poin/minggu.`
+          : trend.direction === "DATA_KURANG"
+            ? "Akun lolos audit; tren distribusi belum bisa dinilai (snapshot < 3 minggu)."
+            : `Akun lolos audit; reach non-follower ${trend.direction === "NAIK" ? "naik" : "stabil"}.`;
+
+  // ── Kampanye (Q2 & Q4) ──
+  const campaignRows: CampaignRow[] = campaigns.map((c) => {
+    const chain = computeCostChain(buildCampaignFunnel(c));
+    const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
+    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target);
+    return {
+      id: c.id,
+      name: c.name,
+      channel: c.channel,
+      status: c.status,
+      spendRibu: chain.spendRibu,
+      cpqlRibu: chain.cpqlRibu,
+      qualifiedLeads: chain.qualifiedLeads,
+      health: campaignHealth(verdict),
+      verdict,
+    };
+  });
+  const summaries: CampaignChainSummary[] = campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    targetCpqlRibu: c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
+    chain: computeCostChain(buildCampaignFunnel(c)),
+  }));
+  const moveBudget = lock.locked ? null : compareCampaigns(summaries);
+  const wastingCampaigns = campaignRows.filter(
+    (r) =>
+      r.status === "AKTIF" &&
+      (r.verdict.decision === "KILL_KAMPANYE" || r.verdict.decision === "GANTI_PENAWARAN"),
+  );
+  const activeCampaigns = campaignRows.filter((r) => r.status === "AKTIF");
+  const adsStatus: StatusLampu | null =
+    gates.gate1 === null || gates.gate0 === null
+      ? null
+      : lock.locked
+        ? "MERAH"
+        : activeCampaigns.length === 0
+          ? null
+          : wastingCampaigns.length > 0
+            ? "MERAH"
+            : activeCampaigns.some((r) => r.health === "LEMAH")
+              ? "KUNING"
+              : activeCampaigns.every((r) => r.health === "BELUM_CUKUP_DATA")
+                ? null
+                : "HIJAU";
+  const adsSummary = lock.locked
+    ? "Vonis dikunci — perbaiki fondasi/tracking dulu."
+    : activeCampaigns.length === 0
+      ? "Tidak ada kampanye aktif tercatat."
+      : wastingCampaigns.length > 0
+        ? `${wastingCampaigns.length} kampanye sedang membuang uang — lihat Q4.`
+        : adsStatus === "HIJAU"
+          ? "Semua kampanye aktif sehat."
+          : adsStatus === null
+            ? "Kampanye aktif belum cukup data untuk dinilai."
+            : "Ada kampanye lemah — butuh iterasi.";
+
+  // ── Q3: pipeline hari ini ──
+  const pipelineByStatus = ACTIVE_STATUSES.map((status) => {
+    const rows = allLeads.filter((l) => l.status === status);
+    return {
+      status,
+      count: rows.length,
+      valueJuta: rows.reduce((s, l) => s + l.estimatedValueJuta, 0),
+    };
+  }).filter((r) => r.count > 0);
+
+  // ── Q5: pemenang organik ──
+  const winnersRaw = detectOrganicWinners(inputs);
+  const winners = lock.locked
+    ? []
+    : winnersRaw.winners.map((w) => {
+        const input = inputs.find((i) => i.id === w.postId)!;
+        const post = posts.find((p) => p.id === w.postId)!;
+        return { postId: w.postId, hook: post.hook, verdict: decideIgWinner(input, w.reasons, inputs.length) };
+      });
+
+  // ── Q6: format terbaik ──
+  const fmt = bestFormat(inputs);
+
+  // ── Q7: follow-up hari ini ──
+  const followUps = followUpQueue(
+    allLeads.map((l) => ({
+      id: l.id,
+      name: l.name,
+      status: l.status,
+      qualityScore: l.qualityScore,
+      qualAnswersCount: l.qualAnswersCount,
+      estimatedValueJuta: l.estimatedValueJuta,
+      createdAt: l.createdAt,
+      lastContactAt: l.lastContactAt,
+      surveyAt: l.surveyAt,
+      proposalSentAt: l.proposalSentAt,
+    })),
+    now,
+  );
+
+  // ── Q8: Top 5 ──
+  const mixVerdict = lock.locked ? null : decideContentMix(contentMixAnalysis(inputs), inputs.length);
+  const top5 = buildTop5({
+    lock,
+    killCampaigns: wastingCampaigns
+      .filter((r) => r.verdict.decision === "KILL_KAMPANYE")
+      .map((r) => ({ id: r.id, name: r.name, verdict: r.verdict })),
+    moveBudget,
+    urgentFollowUps: followUps,
+    winners,
+    mixVerdict,
+    openWarRoomDecisions: openDecisions.map((d) => ({ decision: d.decision, reason: d.reason })),
+  });
+
+  // ── Sekunder ──
+  const posts30 = posts.filter((p) => p.postedAt >= d30);
+  const reach30d = posts30.length ? posts30.reduce((s, p) => s + (p.reach ?? 0), 0) : null;
+  const impressions = campaigns
+    .flatMap((c) => c.metrics)
+    .filter((m) => m.date >= d30)
+    .reduce((s, m) => s + (m.impressions ?? 0), 0);
+
+  return {
+    primary,
+    gates: { gate0: gates.gate0, gate1: gates.gate1 },
+    lock,
+    igHealth: { status: igStatus, trend, lastNonFollowerPct, summary: igSummary },
+    adsHealth: { status: adsStatus, summary: adsSummary },
+    pipelineByStatus,
+    wastingCampaigns,
+    moveBudget,
+    allCampaigns: campaignRows,
+    winners,
+    winnersInsufficient: winnersRaw.insufficient,
+    bestFormat: fmt,
+    followUps,
+    top5,
+    secondary: {
+      reach30d,
+      followers: snapshots[0]?.followerCount ?? null,
+      impressions30d: impressions > 0 ? impressions : null,
+    },
+    hasAnyData: postCount > 0 || campaigns.length > 0 || allLeads.length > 0,
+  };
+}
+
+/** Awal minggu berjalan (WIB) — dipakai halaman laporan. */
+export function currentWeekStartWIB(now = new Date()): Date {
+  return weekStartOf(now);
+}

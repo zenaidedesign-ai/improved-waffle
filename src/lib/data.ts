@@ -128,6 +128,9 @@ export async function getWeekMetrics(weekStart: Date): Promise<WeekMetrics> {
     qualifiedLeads: leads.filter(isLeadQualified).length,
     surveys: leads.filter((l) => SURVEY_OR_BEYOND.includes(l.status)).length,
     proposals: leads.filter((l) => PROPOSAL_OR_BEYOND.includes(l.status)).length,
+    closingValueJuta: leads
+      .filter((l) => l.status === "CLOSING_MENANG")
+      .reduce((s, l) => s + l.estimatedValueJuta, 0),
     pipelineValueJuta: leads
       .filter((l) => !["CLOSING_KALAH", "GHOSTING"].includes(l.status))
       .reduce((s, l) => s + l.estimatedValueJuta, 0),

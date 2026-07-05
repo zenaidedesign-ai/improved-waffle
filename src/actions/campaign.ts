@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { buildCampaignFunnel, getGateStatus } from "@/lib/data";
 import { CONFIG } from "@/lib/domain/config";
-import { CAMPAIGN_OBJECTIVE, CAMPAIGN_STATUS } from "@/lib/domain/enums";
+import { AD_CHANNEL, CAMPAIGN_OBJECTIVE, CAMPAIGN_STATUS } from "@/lib/domain/enums";
 import { computeCostChain, decideCampaign } from "@/lib/engine/adsRescue";
 import { recordVerdict } from "@/lib/verdictLog";
 
@@ -14,6 +14,7 @@ const nonNegInt = z.coerce.number().int().min(0);
 
 const campaignSchema = z.object({
   name: z.string().min(1, "Nama kampanye wajib diisi").max(300),
+  channel: z.enum(AD_CHANNEL).default("META"),
   objective: z.enum(CAMPAIGN_OBJECTIVE),
   status: z.enum(CAMPAIGN_STATUS).default("AKTIF"),
   targetCpqlRibu: z

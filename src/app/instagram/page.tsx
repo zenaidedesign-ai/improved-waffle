@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, EmptyState, GateLockBanner, PageHeader, StatusChip } from "@/components/ui";
+import { Card, DecisionChip, EmptyState, GateLockBanner, PageHeader, StatusChip, VerdictCard } from "@/components/ui";
 import { SnapshotForm } from "@/components/SnapshotForm";
 import { mapPostToInput, getGateStatus } from "@/lib/data";
 import { db } from "@/lib/db";
@@ -18,6 +18,7 @@ import {
   detectOrganicWinners,
   nonFollowerTrend,
 } from "@/lib/engine/igDiagnosis";
+import { decideContentMix, decideIgWinner } from "@/lib/engine/verdicts";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function InstagramPage() {
       .map((s) => ({ date: s.weekStart, pct: s.reachNonFollowerPct! })),
   );
   const mix = contentMixAnalysis(inputs);
+  const mixVerdict = lock.locked ? null : decideContentMix(mix, inputs.length);
   const winners = detectOrganicWinners(inputs);
   const winnerIds = new Set(winners.winners.map((w) => w.postId));
   const byFormat = compareByDimension(inputs, "format");
@@ -136,6 +138,12 @@ export default async function InstagramPage() {
         </Card>
       </div>
 
+      {mixVerdict && (
+        <div className="mb-6">
+          <VerdictCard verdict={mixVerdict} />
+        </div>
+      )}
+
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Card title="Performa per format (median)">
           <CompareTable rows={byFormat} labeler={(k) => IG_FORMAT_LABEL[k as IgFormat] ?? k} />
@@ -158,13 +166,29 @@ export default async function InstagramPage() {
           <ul className="space-y-2">
             {winners.winners.map((w) => {
               const post = posts.find((p) => p.id === w.postId)!;
+              const input = inputs.find((i) => i.id === w.postId)!;
+              const verdict = lock.locked ? null : decideIgWinner(input, w.reasons, inputs.length);
               return (
                 <li key={w.postId} className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
                   <div className="font-semibold text-gray-900">🏆 {post.hook}</div>
                   <div className="mt-0.5 text-xs text-gray-600">{w.reasons.join(" · ")}</div>
-                  <div className="mt-1 text-xs font-semibold text-emerald-700">
-                    Keputusan: jadikan iklan — pertahankan hook, uji CTA langsung ke WA.
-                  </div>
+                  {verdict ? (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DecisionChip decision={verdict.decision} />
+                        <span className="text-[10px] text-gray-500">keyakinan {verdict.confidence.toLowerCase()} · aturan: {verdict.ruleFired}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">{verdict.explanation}</p>
+                      <Link
+                        href={`/eksperimen/baru?postId=${post.id}`}
+                        className="inline-block rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-gray-700"
+                      >
+                        Buat kartu eksperimen iklan →
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">Vonis dikunci sampai gerbang terbuka.</p>
+                  )}
                 </li>
               );
             })}
@@ -220,6 +244,11 @@ export default async function InstagramPage() {
                 ))}
               </tbody>
             </table>
+            <p className="mt-2 text-xs text-gray-400">
+              Skor sinyal = heuristik dengan bobot yang bisa disetel (save/share/klik WA per 100 reach,
+              % non-follower, bonus lead berkualitas) — alat peringkat internal, BUKAN klaim algoritma.
+              “—” berarti data belum cukup, bukan nol.
+            </p>
           </div>
         )}
       </Card>

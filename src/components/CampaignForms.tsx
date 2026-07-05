@@ -7,6 +7,8 @@ import {
   updateCampaignFunnel,
 } from "@/actions/campaign";
 import {
+  AD_CHANNEL,
+  AD_CHANNEL_LABEL,
   CAMPAIGN_OBJECTIVE,
   CAMPAIGN_OBJECTIVE_LABEL,
   CAMPAIGN_STATUS,
@@ -20,6 +22,7 @@ const primaryBtn =
 export function CampaignCreateForm() {
   const [values, setValues] = useState({
     name: "",
+    channel: "META",
     objective: "CHAT_WA",
     targetCpqlRibu: "",
     manualChats: "0",
@@ -39,6 +42,16 @@ export function CampaignCreateForm() {
           <div className="sm:col-span-2">
             <label className={label}>Nama kampanye (sama persis dengan di Ads Manager)</label>
             <input className={input} value={values.name} onChange={(e) => set("name", e.target.value)} />
+          </div>
+          <div>
+            <label className={label}>Kanal</label>
+            <select className={input} value={values.channel} onChange={(e) => set("channel", e.target.value)}>
+              {AD_CHANNEL.map((c) => (
+                <option key={c} value={c}>
+                  {AD_CHANNEL_LABEL[c]}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className={label}>Tujuan</label>

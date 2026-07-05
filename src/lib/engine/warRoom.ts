@@ -6,6 +6,7 @@ export interface WeekMetrics {
   qualifiedLeads: number;
   surveys: number;
   proposals: number;
+  closingValueJuta: number; // nilai proyek CLOSING_MENANG
   pipelineValueJuta: number;
   // diagnostik
   nonFollowerReachPct: number | null;
@@ -56,6 +57,7 @@ export function buildWeeklyCompare(thisWeek: WeekMetrics, lastWeek: WeekMetrics 
     row("qualifiedLeads", "Lead berkualitas", "UTAMA", thisWeek.qualifiedLeads, l?.qualifiedLeads ?? null),
     row("surveys", "Survei terjadwal/selesai", "UTAMA", thisWeek.surveys, l?.surveys ?? null),
     row("proposals", "Proposal terkirim", "UTAMA", thisWeek.proposals, l?.proposals ?? null),
+    row("closingValueJuta", "Nilai closing (jt)", "UTAMA", thisWeek.closingValueJuta, l?.closingValueJuta ?? null),
     row("pipelineValueJuta", "Nilai pipeline (jt)", "UTAMA", thisWeek.pipelineValueJuta, l?.pipelineValueJuta ?? null),
     row("nonFollowerReachPct", "% reach non-follower", "DIAGNOSTIK", thisWeek.nonFollowerReachPct, l?.nonFollowerReachPct ?? null),
     row("saves", "Saves", "DIAGNOSTIK", thisWeek.saves, l?.saves ?? null),
@@ -66,12 +68,18 @@ export function buildWeeklyCompare(thisWeek: WeekMetrics, lastWeek: WeekMetrics 
   ];
 }
 
-/** Awal minggu (Senin 00:00) untuk tanggal tertentu — konsisten di seluruh app. */
+/**
+ * Awal minggu = Senin 00:00 WIB (Asia/Jakarta, UTC+7 tanpa DST) — konsisten di
+ * seluruh app, tidak peduli timezone server. Mengembalikan instan UTC yang
+ * bertepatan dengan Senin 00:00 WIB.
+ */
+const WIB_OFFSET_MS = 7 * 3600 * 1000;
+
 export function weekStartOf(d: Date): Date {
-  const x = new Date(d);
-  const day = x.getDay(); // 0 = Minggu
+  const wib = new Date(d.getTime() + WIB_OFFSET_MS);
+  const day = wib.getUTCDay(); // 0 = Minggu (dalam kerangka WIB)
   const diff = day === 0 ? 6 : day - 1;
-  x.setDate(x.getDate() - diff);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  wib.setUTCDate(wib.getUTCDate() - diff);
+  wib.setUTCHours(0, 0, 0, 0);
+  return new Date(wib.getTime() - WIB_OFFSET_MS);
 }

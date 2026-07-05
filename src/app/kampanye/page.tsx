@@ -3,9 +3,9 @@ import { Card, EmptyState, GateLockBanner, PageHeader, VerdictCard } from "@/com
 import { buildCampaignFunnel, getGateStatus } from "@/lib/data";
 import { db } from "@/lib/db";
 import { CONFIG } from "@/lib/domain/config";
-import { LAPISAN_LABEL } from "@/lib/domain/enums";
+import { AD_CHANNEL_LABEL, LAPISAN_LABEL, type AdChannel } from "@/lib/domain/enums";
 import { formatAngka, formatJuta, formatPct, formatRibu } from "@/lib/format";
-import { computeCostChain, decideCampaign, diagnoseLayer } from "@/lib/engine/adsRescue";
+import { campaignHealth, compareCampaigns, computeCostChain, decideCampaign, diagnoseLayer, KESEHATAN_LABEL, type CampaignChainSummary } from "@/lib/engine/adsRescue";
 import { gateLock } from "@/lib/engine/gates";
 
 export const dynamic = "force-dynamic";
@@ -21,19 +21,29 @@ export default async function KampanyePage() {
   const rows = campaigns.map((c) => {
     const chain = computeCostChain(buildCampaignFunnel(c));
     const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
+    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target);
     return {
       campaign: c,
       chain,
-      verdict: decideCampaign(chain, gates.gate0, gates.gate1, target),
+      verdict,
+      health: campaignHealth(verdict),
       layer: diagnoseLayer(chain, gates.gate0, gates.gate1),
     };
   });
+  const summaries: CampaignChainSummary[] = campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    targetCpqlRibu: c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
+    chain: computeCostChain(buildCampaignFunnel(c)),
+  }));
+  const moveBudget = lock.locked ? null : compareCampaigns(summaries);
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Meta Ads Rescue"
-        subtitle="Rantai kebenaran biaya: spend → biaya per chat → biaya per lead BERKUALITAS → biaya per survei → nilai pipeline. Chat murah bukan bukti iklan bekerja."
+        title="Ads Intelligence"
+        subtitle="Semua kanal (Meta, Google, TikTok, Threads) dinilai dengan rantai kebenaran yang sama: spend → chat → lead BERKUALITAS → survei → pipeline. Chat/klik murah bukan bukti iklan bekerja."
         action={
           <Link
             href="/kampanye/baru"
@@ -50,6 +60,12 @@ export default async function KampanyePage() {
         </div>
       )}
 
+      {moveBudget && (
+        <div className="mb-6">
+          <VerdictCard verdict={moveBudget} />
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <EmptyState>
           Belum ada kampanye tercatat. Tambahkan manual dari angka Ads Manager Anda, atau muat data
@@ -57,7 +73,7 @@ export default async function KampanyePage() {
         </EmptyState>
       ) : (
         <div className="space-y-4">
-          {rows.map(({ campaign, chain, verdict, layer }) => (
+          {rows.map(({ campaign, chain, verdict, health, layer }) => (
             <Card key={campaign.id}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -67,7 +83,10 @@ export default async function KampanyePage() {
                   >
                     {campaign.name}
                   </Link>
-                  <span className="ml-2 text-xs text-gray-400">{campaign.status}</span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {AD_CHANNEL_LABEL[campaign.channel as AdChannel] ?? campaign.channel} · {campaign.status} ·{" "}
+                    <b>{KESEHATAN_LABEL[health]}</b>
+                  </span>
                 </div>
                 <span className="text-xs text-gray-500">
                   Lapisan masalah: <b>{LAPISAN_LABEL[layer.layer]}</b>

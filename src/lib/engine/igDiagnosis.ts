@@ -1,6 +1,6 @@
 // Diagnosa Distribusi Instagram — murni fungsi, tanpa dependensi framework.
 
-import { CONFIG } from "../domain/config";
+import { CONFIG, SIGNAL_WEIGHTS } from "../domain/config";
 import { PILAR_PEMULIHAN, type Pilar } from "../domain/enums";
 import type { IgPostInput } from "./types";
 
@@ -17,24 +17,57 @@ function rate(part: number | null, whole: number | null): number | null {
   return (part / whole) * 100;
 }
 
-/** Skor sinyal per post 0–100 — null kalau reach tidak diisi (data belum cukup). */
+/**
+ * Skor sinyal per post 0–100 — heuristik dengan bobot dari config (bisa disetel),
+ * BUKAN klaim algoritma. null kalau reach kosong ATAU saves/shares/klik WA
+ * semuanya kosong — tidak tahu ≠ nol.
+ */
 export function computeSignalScore(post: IgPostInput): number | null {
   if (post.reach == null || post.reach === 0) return null;
+  if (post.saves == null && post.shares == null && post.waClicks == null) return null;
+  const w = SIGNAL_WEIGHTS;
   const saveRate = rate(post.saves, post.reach) ?? 0; // per 100 reach
   const shareRate = rate(post.shares, post.reach) ?? 0;
   const visitRate = rate(post.profileVisits, post.reach) ?? 0;
   const waRate = rate(post.waClicks, post.reach) ?? 0;
   const nonFollowerPct = rate(post.reachNonFollower, post.reach) ?? 0;
-  // Bobot: sinyal niat (save/share) + jembatan bisnis (kunjungan profil, klik WA)
-  // + distribusi (non-follower). Lead berkualitas = bonus besar (sinyal bisnis nyata).
   const raw =
-    saveRate * 8 +
-    shareRate * 10 +
-    visitRate * 5 +
-    waRate * 12 +
-    nonFollowerPct * 0.3 +
-    post.qualifiedLeadsAttributed * 15;
+    saveRate * w.saveRatePer100Reach +
+    shareRate * w.shareRatePer100Reach +
+    visitRate * w.profileVisitRatePer100Reach +
+    waRate * w.waClickRatePer100Reach +
+    nonFollowerPct * w.nonFollowerPct +
+    post.qualifiedLeadsAttributed * w.perQualifiedLead;
   return Math.round(Math.min(100, raw) * 10) / 10;
+}
+
+export interface BestFormatResult {
+  insufficient: boolean;
+  best: { format: string; n: number; reason: string } | null;
+}
+
+/** Format terbaik saat ini — butuh ≥ bestFormatMinPosts per format agar jujur. */
+export function bestFormat(posts: IgPostInput[]): BestFormatResult {
+  const rows = compareByDimension(posts, "format").filter((r) => r.n >= CONFIG.bestFormatMinPosts);
+  if (rows.length === 0) return { insufficient: true, best: null };
+  const scored = rows
+    .map((r) => ({
+      ...r,
+      // Peringkat berdasarkan sinyal niat + bisnis (median), lead sebagai penentu seri.
+      rankScore:
+        (r.medianSaves ?? 0) + (r.medianShares ?? 0) * 1.5 + (r.medianWaClicks ?? 0) * 3 + r.totalQualifiedLeads * 10,
+    }))
+    .sort((a, b) => b.rankScore - a.rankScore);
+  const top = scored[0];
+  if (top.rankScore === 0) return { insufficient: true, best: null };
+  return {
+    insufficient: false,
+    best: {
+      format: top.key,
+      n: top.n,
+      reason: `median saves ${top.medianSaves ?? 0}, shares ${top.medianShares ?? 0}, klik WA ${top.medianWaClicks ?? 0}, ${top.totalQualifiedLeads} lead berkualitas dari ${top.n} post`,
+    },
+  };
 }
 
 export interface WinnerResult {

@@ -154,6 +154,7 @@ model Experiment {
 model Campaign {
   id                   String                @id @default(cuid())
   name                 String                @unique
+  channel              String                @default("META") // "META" | "GOOGLE" | "TIKTOK" | "THREADS"
   objective            String // "CHAT_WA" | "LEAD_FORM" | "TRAFFIC" | "LAINNYA"
   status               String                @default("AKTIF") // "AKTIF" | "PAUSED" | "SELESAI"
   targetCpqlRibu       Int? // per-campaign override; global default in settings
@@ -220,6 +221,9 @@ model Lead {
   qualAnswersCount   Int         @default(0)
   estimatedValueJuta Int         @default(0)
   lastContactAt      DateTime?
+  surveyAt           DateTime? // jadwal survei (Survey Scheduler)
+  proposalSentAt     DateTime? // kapan proposal dikirim (Proposal Tracker)
+  notes              String?
   createdAt          DateTime    @default(now())
   isExample          Boolean     @default(false)
   events             LeadEvent[]
@@ -290,4 +294,53 @@ model Setting {
   rationale    String
   groupKey     String
   updatedAt    DateTime @updatedAt
+}
+
+// ── Competitor Intelligence Lab (input manual dari tautan publik) ──
+model Competitor {
+  id         String               @id @default(cuid())
+  name       String
+  igUrl      String?
+  threadsUrl String?
+  tiktokUrl  String?
+  websiteUrl String?
+  notes      String?
+  createdAt  DateTime             @default(now())
+  isExample  Boolean              @default(false)
+  analyses   CompetitorAnalysis[]
+}
+
+model CompetitorAnalysis {
+  id               String     @id @default(cuid())
+  competitorId     String
+  competitor       Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  analyzedAt       DateTime   @default(now())
+  positioning      String
+  offer            String
+  cta              String
+  visualStyle      String
+  contentPattern   String
+  postingFrequency String
+  hookPattern      String
+  marketGap        String
+  adaptationIdeas  String // WAJIB: adaptasi utk Zenaide — decode, bukan copy
+  isExample        Boolean    @default(false)
+}
+
+// ── Perpustakaan konten (Content Intelligence) ──
+model PainPoint {
+  id        String   @id @default(cuid())
+  text      String // masalah klien, bahasa klien
+  audience  String? // siapa yang merasakannya
+  source    String? // dari mana didengar (chat, survei, komentar)
+  createdAt DateTime @default(now())
+  isExample Boolean  @default(false)
+}
+
+model Objection {
+  id        String   @id @default(cuid())
+  text      String // keberatan calon klien
+  answer    String // jawaban terbaik versi Zenaide
+  createdAt DateTime @default(now())
+  isExample Boolean  @default(false)
 }

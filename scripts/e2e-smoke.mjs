@@ -28,7 +28,7 @@ async function check(name, fn) {
 // 1. Ruang Kendali kosong — semua gerbang belum diaudit, banner kunci tampil
 await check("home: gerbang terkunci saat DB kosong", async () => {
   await page.goto(BASE + "/");
-  await page.waitForSelector("text=Ruang Kendali");
+  await page.waitForSelector("text=Dashboard Intelijen Pemasaran");
   const banner = await page.textContent("body");
   if (!banner.includes("Vonis dikunci")) throw new Error("banner kunci tidak tampil");
   if (!banner.includes("Belum diaudit")) throw new Error("status belum diaudit tidak tampil");
@@ -125,6 +125,60 @@ await check("buka gerbang lalu kampanye memberi vonis nyata", async () => {
 });
 await page.screenshot({ path: SHOTS + "/07-kampanye-vonis.png", fullPage: true });
 
+// 9b. Dashboard penuh setelah gerbang terbuka
+await check("dashboard: 8 pertanyaan + pindah budget + follow-up + top5", async () => {
+  await page.goto(BASE + "/");
+  const body = await page.textContent("body");
+  for (const label of ["Lead Berkualitas", "Nilai Closing", "Nilai Pipeline", "Top 5 Prioritas", "Apakah Instagram sehat", "Apakah iklan sehat", "Pipeline hari ini", "membuang uang", "layak jadi iklan", "Format konten terbaik", "follow-up HARI INI", "Metrik sekunder"]) {
+    if (!body.includes(label)) throw new Error(`bagian hilang: ${label}`);
+  }
+  if (!body.includes("Pindah budget")) throw new Error("usulan pindah budget tidak muncul");
+});
+await page.screenshot({ path: SHOTS + "/10-dashboard.png", fullPage: true });
+
+// 9c. Lead Intelligence — triase
+await check("leads: triase urgen + hot + probabilitas closing", async () => {
+  await page.goto(BASE + "/leads");
+  const body = await page.textContent("body");
+  if (!body.includes("Urgen hari ini")) throw new Error("triase URGENT tidak muncul");
+  if (!body.includes("Hot lead")) throw new Error("triase HOT tidak muncul");
+  if (!body.includes("Prob. closing")) throw new Error("kolom probabilitas hilang");
+  if (!body.includes("estimasi kasar")) throw new Error("label estimasi kasar hilang (kejujuran)");
+});
+await page.screenshot({ path: SHOTS + "/11-leads.png", fullPage: true });
+
+// 9d. Kompetitor battle card
+await check("kompetitor: battle card contoh tampil", async () => {
+  await page.goto(BASE + "/kompetitor");
+  await page.click("text=Studio Interior X");
+  await page.waitForURL("**/kompetitor/**", { timeout: 15000 });
+  await page.waitForSelector("text=Adaptasi untuk Zenaide", { timeout: 15000 });
+  const body = await page.textContent("body");
+  if (!body.includes("Adaptasi untuk Zenaide")) throw new Error("kolom adaptasi hilang");
+  if (!body.includes("JANGAN meniru")) throw new Error("pagar anti-copy hilang");
+});
+
+// 9e. Eksperimen & library
+await check("eksperimen: kartu 6 kolom + cakupan pilar; library terisi", async () => {
+  await page.goto(BASE + "/eksperimen");
+  const body = await page.textContent("body");
+  if (!body.includes("Metrik sukses")) throw new Error("kolom metrik sukses hilang");
+  if (!body.includes("Aturan setelah uji")) throw new Error("kolom aturan keputusan hilang");
+  await page.goto(BASE + "/library");
+  const body2 = await page.textContent("body");
+  if (!body2.includes("budget bengkak")) throw new Error("pain point contoh hilang");
+});
+
+// 9f. Laporan revenue
+await check("laporan: pipeline + top priority dari data nyata", async () => {
+  await page.goto(BASE + "/laporan");
+  const body = await page.textContent("body");
+  if (!body.includes("Pipeline minggu ini")) throw new Error("judul pipeline hilang");
+  if (!body.includes("Top Priority")) throw new Error("top priority hilang");
+  if (!body.includes("Qualified Leads")) throw new Error("metrik utama hilang");
+});
+await page.screenshot({ path: SHOTS + "/12-laporan.png", fullPage: true });
+
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {
   await page.goto(BASE + "/war-room");
@@ -139,11 +193,15 @@ await check("war room: compare + komit 2 keputusan", async () => {
 });
 await page.screenshot({ path: SHOTS + "/08-war-room.png", fullPage: true });
 
-// 11. Keputusan war room muncul di Ruang Kendali
-await check("keputusan terbuka muncul di ruang kendali", async () => {
+// 11. Top 5 penuh & keputusan war room tersimpan (dashboard memotong di 5 — by design)
+await check("top 5 penuh; keputusan war room tercatat di sesi", async () => {
   await page.goto(BASE + "/");
   const body = await page.textContent("body");
-  if (!body.includes("jebakan chat murah")) throw new Error("keputusan tidak muncul di antrian");
+  if (!body.includes("Top 5 Prioritas")) throw new Error("blok top 5 hilang");
+  if (!body.includes("Pindahkan budget")) throw new Error("prioritas pindah budget hilang");
+  await page.goto(BASE + "/war-room");
+  const wr = await page.textContent("body");
+  if (!wr.includes("jebakan chat murah")) throw new Error("keputusan tidak tersimpan di sesi war room");
 });
 await page.screenshot({ path: SHOTS + "/09-home-final.png", fullPage: true });
 
