@@ -32,6 +32,7 @@ const postSchema = z.object({
   leadsManual: optionalInt,
   qualifiedLeadsManual: optionalInt,
   dataSource: z.enum(["MANUAL", "SCREENSHOT"]).default("MANUAL"),
+  experimentId: z.union([z.string(), z.literal(""), z.undefined()]).transform((v) => (v ? v : null)),
 });
 
 export type IgPostPayload = z.input<typeof postSchema>;

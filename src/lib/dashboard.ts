@@ -14,7 +14,10 @@ import {
   type CampaignChainSummary,
   type KesehatanKampanye,
 } from "./engine/adsRescue";
-import { gateLock, type GateLockResult } from "./engine/gates";
+import { gateLock, type AuditAging, type GateLockResult } from "./engine/gates";
+import { assessDataQuality } from "./engine/adsRescue";
+import { backupDue } from "./engine/dataTruth";
+import { rankAdCandidates } from "./engine/verdicts";
 import {
   bestFormat,
   contentMixAnalysis,
@@ -50,6 +53,8 @@ export interface DashboardData {
     closingValueJuta: number;
     pipelineValueJuta: number;
     cpqlRibu: number | null; // spend iklan bulan ini / lead berkualitas dari iklan
+    costPerSurveyRibu: number | null; // spend iklan / survei dari lead iklan (bulan ini)
+    costPerProposalRibu: number | null;
   };
   // Q1 & Q2
   gates: { gate0: StatusLampu | null; gate1: StatusLampu | null };
@@ -67,8 +72,8 @@ export interface DashboardData {
   wastingCampaigns: CampaignRow[];
   moveBudget: VerdictProposal | null;
   allCampaigns: CampaignRow[];
-  // Q5
-  winners: Array<{ postId: string; hook: string; verdict: VerdictProposal }>;
+  // Q5 — diurut berdasar skor kandidat (heuristik pengurut, bukan prediksi ROI)
+  winners: Array<{ postId: string; hook: string; verdict: VerdictProposal; candidateScore: number | null }>;
   winnersInsufficient: boolean;
   // Q6
   bestFormat: BestFormatResult;
@@ -79,6 +84,8 @@ export interface DashboardData {
   // Sekunder (sengaja di bawah)
   secondary: { reach30d: number | null; followers: number | null; impressions30d: number | null };
   hasAnyData: boolean;
+  auditAging: Array<{ type: string; aging: AuditAging }>;
+  backup: { due: boolean; message: string | null };
 }
 
 const ACTIVE_STATUSES = [
@@ -95,7 +102,7 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const d30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
-  const [gates, leadsMonth, allLeads, posts, snapshots, campaigns, openDecisions, postCount] =
+  const [gates, leadsMonth, allLeads, posts, snapshots, campaigns, openDecisions, postCount, lastBackup] =
     await Promise.all([
       getGateStatus(),
       db.lead.findMany({ where: { createdAt: { gte: monthStart } } }),
@@ -105,6 +112,7 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
       db.campaign.findMany({ include: { metrics: true, leads: true } }),
       db.warRoomDecision.findMany({ where: { status: "TERBUKA" }, take: 10 }),
       db.igPost.count(),
+      db.setting.findUnique({ where: { key: "backup.lastExportAt" } }),
     ]);
 
   const lock = gateLock(gates.gate0, gates.gate1);
@@ -135,6 +143,16 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
       monthSpendRibu > 0 && adsQualifiedMonth > 0
         ? Math.round(monthSpendRibu / adsQualifiedMonth)
         : null,
+    costPerSurveyRibu: (() => {
+      const n = leadsMonth.filter((l) => l.sourceType === "ADS" &&
+        ["SURVEI_TERJADWAL", "SURVEI_SELESAI", "PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status)).length;
+      return monthSpendRibu > 0 && n > 0 ? Math.round(monthSpendRibu / n) : null;
+    })(),
+    costPerProposalRibu: (() => {
+      const n = leadsMonth.filter((l) => l.sourceType === "ADS" &&
+        ["PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status)).length;
+      return monthSpendRibu > 0 && n > 0 ? Math.round(monthSpendRibu / n) : null;
+    })(),
   };
 
   // ── Q1: Instagram sehat? ──
@@ -167,7 +185,8 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
   const campaignRows: CampaignRow[] = campaigns.map((c) => {
     const chain = computeCostChain(buildCampaignFunnel(c));
     const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
-    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target);
+    const dq = assessDataQuality(c.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), now);
+    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target, dq);
     return {
       id: c.id,
       name: c.name,
@@ -232,13 +251,27 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
 
   // ── Q5: pemenang organik ──
   const winnersRaw = detectOrganicWinners(inputs);
+  const ranked = rankAdCandidates(
+    winnersRaw.winners.map((w) => {
+      const post = posts.find((p) => p.id === w.postId)!;
+      return { post: inputs.find((i) => i.id === w.postId)!, signalScore: post.signalScore, reasons: w.reasons };
+    }),
+  );
+  const scoreOf = new Map(ranked.map((r) => [r.postId, r.score]));
   const winners = lock.locked
     ? []
-    : winnersRaw.winners.map((w) => {
-        const input = inputs.find((i) => i.id === w.postId)!;
-        const post = posts.find((p) => p.id === w.postId)!;
-        return { postId: w.postId, hook: post.hook, verdict: decideIgWinner(input, w.reasons, inputs.length) };
-      });
+    : winnersRaw.winners
+        .map((w) => {
+          const input = inputs.find((i) => i.id === w.postId)!;
+          const post = posts.find((p) => p.id === w.postId)!;
+          return {
+            postId: w.postId,
+            hook: post.hook,
+            verdict: decideIgWinner(input, w.reasons, inputs.length),
+            candidateScore: scoreOf.get(w.postId) ?? null,
+          };
+        })
+        .sort((a, b) => (b.candidateScore ?? -1) - (a.candidateScore ?? -1));
 
   // ── Q6: format terbaik ──
   const fmt = bestFormat(inputs);
@@ -303,6 +336,8 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
       impressions30d: impressions > 0 ? impressions : null,
     },
     hasAnyData: postCount > 0 || campaigns.length > 0 || allLeads.length > 0,
+    auditAging: gates.agings.filter((a) => a.aging.aged),
+    backup: backupDue(lastBackup ? new Date(lastBackup.value) : null, now, CONFIG.backupMaxAgeDays),
   };
 }
 

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { CONFIG } from "@/lib/domain/config";
 import { LAPISAN_LABEL, type Keputusan } from "@/lib/domain/enums";
 import { formatAngka, formatRibu, formatTanggal, formatTanggalJam } from "@/lib/format";
-import { computeCostChain, decideCampaign, diagnoseLayer } from "@/lib/engine/adsRescue";
+import { assessDataQuality, computeCostChain, decideCampaign, diagnoseLayer } from "@/lib/engine/adsRescue";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,8 @@ export default async function KampanyeDetailPage({ params }: { params: Promise<{
   const gates = await getGateStatus();
   const chain = computeCostChain(buildCampaignFunnel(campaign));
   const target = campaign.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
-  const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target);
+  const dq = assessDataQuality(campaign.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), new Date());
+  const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target, dq);
   const layer = diagnoseLayer(chain, gates.gate0, gates.gate1);
   const recordWithId = recordCampaignVerdict.bind(null, campaign.id);
 

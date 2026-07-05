@@ -79,6 +79,7 @@ await page.screenshot({ path: SHOTS + "/04-instagram.png", fullPage: true });
 await check("form post: simpan post baru", async () => {
   await page.goto(BASE + "/instagram/post/baru");
   await page.fill('input[placeholder*="Renovasi molor"]', "[TES] Hook percobaan e2e");
+  await page.selectOption("select", { index: 1 }); // tautkan ke eksperimen pertama (blocker #3)
   await page.click('button:has-text("Simpan & selesai")');
   await page.waitForURL("**/instagram", { timeout: 15000 });
   const body = await page.textContent("body");
@@ -122,6 +123,7 @@ await check("buka gerbang lalu kampanye memberi vonis nyata", async () => {
   if (body.includes("Vonis dikunci")) throw new Error("masih terkunci setelah semua audit hijau");
   if (!body.includes("JEBAKAN CHAT MURAH")) throw new Error("jebakan chat murah tidak terdeteksi di kampanye contoh");
   if (!body.includes("Scale kampanye")) throw new Error("kampanye sehat tidak dapat vonis scale");
+  if (!body.includes("input manual (andal 60–90%)")) throw new Error("catatan keandalan tidak masuk KE DALAM kartu vonis (blocker #1)");
 });
 await page.screenshot({ path: SHOTS + "/07-kampanye-vonis.png", fullPage: true });
 
@@ -133,6 +135,10 @@ await check("dashboard: 8 pertanyaan + pindah budget + follow-up + top5", async 
     if (!body.includes(label)) throw new Error(`bagian hilang: ${label}`);
   }
   if (!body.includes("Pindah budget")) throw new Error("usulan pindah budget tidak muncul");
+  if (!body.includes("Biaya/Survei")) throw new Error("tile biaya per survei hilang (blocker #6)");
+  if (!body.includes("Biaya/Proposal")) throw new Error("tile biaya per proposal hilang (blocker #6)");
+  if (!body.includes("Belum pernah ada cadangan")) throw new Error("pengingat cadangan hilang (blocker #8)");
+  if (!body.includes("skor ")) throw new Error("skor kandidat iklan hilang di Q5 (blocker #9)");
 });
 await page.screenshot({ path: SHOTS + "/10-dashboard.png", fullPage: true });
 
@@ -144,6 +150,7 @@ await check("leads: triase urgen + hot + probabilitas closing", async () => {
   if (!body.includes("Hot lead")) throw new Error("triase HOT tidak muncul");
   if (!body.includes("Prob. closing")) throw new Error("kolom probabilitas hilang");
   if (!body.includes("estimasi kasar")) throw new Error("label estimasi kasar hilang (kejujuran)");
+  if (!body.includes("👑")) throw new Error("flag Tangani Noor sendiri hilang (blocker #5)");
 });
 await page.screenshot({ path: SHOTS + "/11-leads.png", fullPage: true });
 
@@ -164,6 +171,8 @@ await check("eksperimen: kartu 6 kolom + cakupan pilar; library terisi", async (
   const body = await page.textContent("body");
   if (!body.includes("Metrik sukses")) throw new Error("kolom metrik sukses hilang");
   if (!body.includes("Aturan setelah uji")) throw new Error("kolom aturan keputusan hilang");
+  if (!body.includes("Post tertaut")) throw new Error("blok post tertaut hilang (blocker #3)");
+  if (!body.includes("[TES] Hook percobaan e2e")) throw new Error("post yang ditautkan dari form tidak muncul di eksperimen");
   await page.goto(BASE + "/library");
   const body2 = await page.textContent("body");
   if (!body2.includes("budget bengkak")) throw new Error("pain point contoh hilang");

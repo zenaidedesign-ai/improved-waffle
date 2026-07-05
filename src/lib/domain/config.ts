@@ -88,6 +88,22 @@ export const CONFIG = {
   /** Maks keputusan per sesi War Room. Alasan: > 5 keputusan = tidak ada yang jalan. */
   warRoomMaxDecisions: 5,
 
+  /** Split test: dua kampanye ber-CPQL sehat yang selisihnya < 25% dianggap
+   *  "sama dalam batas noise" — memindah budget di selisih sekecil ini = menebak. */
+  splitTestCpqlNoisePct: 25,
+
+  /** Lead yang WAJIB ditangani Noor sendiri: nilai ≥ 300 jt (satu proyek besar
+   *  menutup CAC berbulan-bulan), status negosiasi, atau prob. closing ≥ 60%. */
+  noorHandleValueJuta: 300,
+  noorHandleClosingProbPct: 60,
+
+  /** Audit lebih tua dari 30 hari = kadaluarsa; status HIJAU turun ke KUNING.
+   *  Alasan: kondisi akun Meta bisa berubah tanpa pemberitahuan. */
+  auditMaxAgeDays: 30,
+
+  /** Ingatkan cadangan CSV kalau ekspor terakhir > 7 hari (DB = 1 file SQLite). */
+  backupMaxAgeDays: 7,
+
   /** Pindah budget: kampanye terbaik CPQL ≤ target DAN terburuk ≥ 2× targetnya.
    *  Alasan: selisih < 2× masih bisa noise; ≥ 2× adalah perbedaan nyata. */
   adsMoveBudgetWorstMultiple: 2,

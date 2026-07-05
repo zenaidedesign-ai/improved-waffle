@@ -36,6 +36,8 @@ export interface TriageResult {
   silentDays: number;
   ghostingRisk: boolean;
   closingProbabilityPct: number; // estimasi kasar — SELALU dilabeli begitu di UI
+  noorHandle: boolean; // WAJIB ditangani owner sendiri, jangan didelegasikan
+  noorReason: string | null;
 }
 
 const TERMINAL = ["CLOSING_MENANG", "CLOSING_KALAH", "GHOSTING"];
@@ -88,13 +90,29 @@ export function triageLead(lead: LeadTriageInput, now: Date): TriageResult {
   const qualified = isQualifiedInput(lead);
   const H = 3600 * 1000;
 
-  const done = (triage: Triage, reason: string): TriageResult => ({
-    triage,
-    reason,
-    silentDays,
-    ghostingRisk,
-    closingProbabilityPct: prob,
-  });
+  // Flag "Tangani Noor sendiri" — deterministik, alasan selalu tertulis.
+  const noorReasons: string[] = [];
+  const active = !TERMINAL.includes(lead.status);
+  if (active && lead.estimatedValueJuta >= CONFIG.noorHandleValueJuta)
+    noorReasons.push(`nilai proyek Rp ${lead.estimatedValueJuta} jt (≥ ${CONFIG.noorHandleValueJuta} jt)`);
+  if (lead.status === "NEGOSIASI") noorReasons.push("sedang negosiasi harga");
+  if (active && prob >= CONFIG.noorHandleClosingProbPct)
+    noorReasons.push(`prob. closing ${prob}%`);
+
+  const done = (triage: Triage, reason: string): TriageResult => {
+    if ((triage === "HOT_LEAD" || triage === "URGENT") && active && noorReasons.length === 0)
+      noorReasons.push(triage === "URGENT" ? "urgen hari ini" : "hot lead");
+    const noorHandle = active && noorReasons.length > 0 && triage !== "DEAD_LEAD" && triage !== "IGNORE";
+    return {
+      triage,
+      reason,
+      silentDays,
+      ghostingRisk,
+      closingProbabilityPct: prob,
+      noorHandle,
+      noorReason: noorHandle ? noorReasons.join(" · ") : null,
+    };
+  };
 
   // 1. Mati: kalah / ghosting / senyap sangat lama dengan skor rendah.
   if (lead.status === "CLOSING_KALAH") return done("DEAD_LEAD", "Closing kalah — arsipkan, catat alasannya.");

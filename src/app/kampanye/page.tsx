@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { CONFIG } from "@/lib/domain/config";
 import { AD_CHANNEL_LABEL, LAPISAN_LABEL, type AdChannel } from "@/lib/domain/enums";
 import { formatAngka, formatJuta, formatPct, formatRibu } from "@/lib/format";
-import { campaignHealth, compareCampaigns, computeCostChain, decideCampaign, diagnoseLayer, KESEHATAN_LABEL, type CampaignChainSummary } from "@/lib/engine/adsRescue";
+import { assessDataQuality, campaignHealth, compareCampaigns, computeCostChain, decideCampaign, diagnoseLayer, KESEHATAN_LABEL, type CampaignChainSummary } from "@/lib/engine/adsRescue";
 import { gateLock } from "@/lib/engine/gates";
 import { DataTruthPanel } from "@/components/DataTruthPanel";
 import { getTruthPanelData } from "@/lib/truthPanel";
@@ -20,10 +20,12 @@ export default async function KampanyePage() {
     include: { metrics: true, leads: true },
   });
 
+  const now = new Date();
   const rows = campaigns.map((c) => {
     const chain = computeCostChain(buildCampaignFunnel(c));
     const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
-    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target);
+    const dq = assessDataQuality(c.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), now);
+    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target, dq);
     return {
       campaign: c,
       chain,

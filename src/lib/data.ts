@@ -6,7 +6,7 @@ import type { Campaign, CampaignMetricDaily, IgPost, Lead } from "@prisma/client
 import { CONFIG } from "./domain/config";
 import type { StatusLampu } from "./domain/enums";
 import type { CampaignFunnelInput } from "./engine/adsRescue";
-import { combineGate0 } from "./engine/gates";
+import { applyAuditAging, combineGate0, type AuditAging } from "./engine/gates";
 import type { IgPostInput } from "./engine/types";
 import type { WeekMetrics } from "./engine/warRoom";
 import { weekStartOf } from "./engine/warRoom";
@@ -60,9 +60,11 @@ export interface GateStatus {
   metaVerdict: StatusLampu | null;
   rekomendasiVerdict: StatusLampu | null;
   trackingVerdict: StatusLampu | null;
+  /** Audit yang menua (> 30 hari): HIJAU sudah diturunkan ke KUNING di verdict di atas. */
+  agings: Array<{ type: string; aging: AuditAging }>;
 }
 
-export async function getGateStatus(): Promise<GateStatus> {
+export async function getGateStatus(now = new Date()): Promise<GateStatus> {
   const latest = async (type: string) =>
     db.auditRun.findFirst({ where: { type }, orderBy: { runDate: "desc" } });
   const [meta, rekom, tracking] = await Promise.all([
@@ -70,15 +72,22 @@ export async function getGateStatus(): Promise<GateStatus> {
     latest("REKOMENDASI"),
     latest("TRACKING"),
   ]);
-  const metaVerdict = (meta?.verdict as StatusLampu) ?? null;
-  const rekomendasiVerdict = (rekom?.verdict as StatusLampu) ?? null;
-  const trackingVerdict = (tracking?.verdict as StatusLampu) ?? null;
+  const agings: Array<{ type: string; aging: AuditAging }> = [];
+  const aged = (run: { verdict: string; runDate: Date } | null, type: string): StatusLampu | null => {
+    const r = applyAuditAging((run?.verdict as StatusLampu) ?? null, run?.runDate ?? null, now);
+    if (r.aging) agings.push({ type, aging: r.aging });
+    return r.verdict;
+  };
+  const metaVerdict = aged(meta, "META_ACCOUNT");
+  const rekomendasiVerdict = aged(rekom, "REKOMENDASI");
+  const trackingVerdict = aged(tracking, "TRACKING");
   return {
     gate0: combineGate0(metaVerdict, rekomendasiVerdict),
     gate1: trackingVerdict,
     metaVerdict,
     rekomendasiVerdict,
     trackingVerdict,
+    agings,
   };
 }
 

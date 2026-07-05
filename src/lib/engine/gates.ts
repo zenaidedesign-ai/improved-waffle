@@ -3,6 +3,7 @@
 // menghasilkan vonis WAJIB memanggilnya lebih dulu. Layar baru yang lupa
 // memanggil = bug; lihat tests/engine/gates.test.ts.
 
+import { CONFIG } from "../domain/config";
 import type { StatusLampu } from "../domain/enums";
 import type { AuditAnswerInput, GateResult, VerdictProposal } from "./types";
 import type { AuditItemDef } from "../domain/auditItems";
@@ -69,6 +70,30 @@ export function buildRepairPlan(
         priority: idx + 1,
       };
     });
+}
+
+export interface AuditAging {
+  aged: boolean;
+  ageDays: number;
+  maxDays: number;
+}
+
+/**
+ * Audit lebih tua dari 30 hari = kadaluarsa: HIJAU turun ke KUNING.
+ * Alasan: status akun Meta bisa berubah tanpa pemberitahuan — audit lama
+ * bukan bukti kondisi sekarang. MERAH tetap MERAH.
+ */
+export function applyAuditAging(
+  verdict: StatusLampu | null,
+  runDate: Date | null,
+  now: Date,
+): { verdict: StatusLampu | null; aging: AuditAging | null } {
+  if (verdict === null || runDate === null) return { verdict, aging: null };
+  const ageDays = Math.floor((now.getTime() - runDate.getTime()) / (24 * 3600 * 1000));
+  const aged = ageDays > CONFIG.auditMaxAgeDays;
+  const aging: AuditAging = { aged, ageDays, maxDays: CONFIG.auditMaxAgeDays };
+  if (!aged) return { verdict, aging };
+  return { verdict: verdict === "HIJAU" ? "KUNING" : verdict, aging };
 }
 
 /** Gerbang 0 = kondisi TERBURUK dari audit akun Meta dan audit rekomendasi. */

@@ -197,8 +197,8 @@ describe("buildTop5", () => {
         { id: "2", name: "b", verdict: { decision: "KILL_KAMPANYE", ruleFired: "r", trigger: {}, confidence: "TINGGI", explanation: "e" } },
       ],
       urgentFollowUps: [
-        { id: "l1", name: "A", status: "BERKUALITAS", estimatedValueJuta: 1, triage: "URGENT", reason: "r", silentDays: 3, ghostingRisk: false, closingProbabilityPct: 30 },
-        { id: "l2", name: "B", status: "BERKUALITAS", estimatedValueJuta: 2, triage: "URGENT", reason: "r", silentDays: 3, ghostingRisk: false, closingProbabilityPct: 30 },
+        { id: "l1", name: "A", status: "BERKUALITAS", estimatedValueJuta: 1, triage: "URGENT", reason: "r", silentDays: 3, ghostingRisk: false, closingProbabilityPct: 30, noorHandle: true, noorReason: "urgen hari ini" },
+        { id: "l2", name: "B", status: "BERKUALITAS", estimatedValueJuta: 2, triage: "URGENT", reason: "r", silentDays: 3, ghostingRisk: false, closingProbabilityPct: 30, noorHandle: true, noorReason: "urgen hari ini" },
       ],
       openWarRoomDecisions: [{ decision: "KILL_KAMPANYE", reason: "x" }],
     });

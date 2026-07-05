@@ -34,13 +34,19 @@ const NUMERIC_FIELDS: Array<{ key: string; label: string }> = [
 
 const emptyNumbers = Object.fromEntries(NUMERIC_FIELDS.map((f) => [f.key, ""]));
 
-export function QuickPostForm() {
+export interface ExperimentOption {
+  id: string;
+  title: string;
+}
+
+export function QuickPostForm({ experiments = [] }: { experiments?: ExperimentOption[] }) {
   const router = useRouter();
   const [postedAt, setPostedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [format, setFormat] = useState<IgFormat>("REELS");
   const [pillar, setPillar] = useState<Pilar>("PORTFOLIO_LAIN");
   const [hook, setHook] = useState("");
   const [cta, setCta] = useState("");
+  const [experimentId, setExperimentId] = useState("");
   const [numbers, setNumbers] = useState<Record<string, string>>(emptyNumbers);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +67,7 @@ export function QuickPostForm() {
           pillar,
           hook: hook.trim(),
           cta: cta || undefined,
+          experimentId: experimentId || undefined,
           ...(numbers as Record<string, string>),
         });
         if (andNew) {
@@ -128,6 +135,23 @@ export function QuickPostForm() {
             className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
           />
         </div>
+        {experiments.length > 0 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-xs font-semibold text-gray-500">
+              Tautkan ke eksperimen (opsional) — supaya hasilnya bisa dievaluasi terhadap kartunya
+            </label>
+            <select
+              value={experimentId}
+              onChange={(e) => setExperimentId(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            >
+              <option value="">— tanpa eksperimen —</option>
+              {experiments.map((x) => (
+                <option key={x.id} value={x.id}>{x.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="mt-3">
           <label className="mb-1 block text-xs font-semibold text-gray-500">CTA (opsional)</label>
           <input

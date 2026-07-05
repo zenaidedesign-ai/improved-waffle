@@ -29,6 +29,19 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jenis: string 
     return new NextResponse("Jenis ekspor tidak dikenal", { status: 404 });
   }
 
+  // Ekspor apa pun dihitung sebagai cadangan — stempel waktunya.
+  await db.setting.upsert({
+    where: { key: "backup.lastExportAt" },
+    update: { value: new Date().toISOString() },
+    create: {
+      key: "backup.lastExportAt",
+      value: new Date().toISOString(),
+      label: "Cadangan CSV terakhir",
+      defaultValue: "",
+      rationale: "DB = satu file SQLite; ekspor CSV mingguan adalah cadangan minimum sampai ada backup sungguhan.",
+      groupKey: "data",
+    },
+  });
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

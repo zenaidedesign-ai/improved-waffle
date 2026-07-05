@@ -15,7 +15,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function EksperimenPage() {
-  const experiments = await db.experiment.findMany({ orderBy: { createdAt: "desc" } });
+  const experiments = await db.experiment.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { posts: { orderBy: { postedAt: "desc" } } },
+  });
   const now = new Date();
   const due = experiments.filter((e) => e.status === "RUNNING" && e.cycleEnd && e.cycleEnd <= now);
   const byStatus = (s: string) => experiments.filter((e) => e.status === s);
@@ -94,6 +97,27 @@ export default async function EksperimenPage() {
                         <b>Aturan setelah uji:</b> {e.decisionRuleAfterTest}
                       </p>
                       {e.resultNotes && <p className="mt-1 text-xs text-gray-600">Hasil: {e.resultNotes}</p>}
+                      {e.posts.length > 0 ? (
+                        <div className="mt-1.5 rounded bg-white p-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                            Post tertaut ({e.posts.length}) — bandingkan dengan metrik sukses di atas
+                          </p>
+                          <ul className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                            {e.posts.map((p) => (
+                              <li key={p.id}>
+                                • {p.hook.slice(0, 55)} — reach {p.reach ?? "—"}, saves {p.saves ?? "—"},
+                                shares {p.shares ?? "—"}, klik WA {p.waClicks ?? "—"}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        e.status === "RUNNING" && (
+                          <p className="mt-1 text-[11px] text-amber-600">
+                            Belum ada post tertaut — tautkan dari form “Catat post” agar hasil bisa dievaluasi.
+                          </p>
+                        )
+                      )}
                       <div className="mt-2 flex gap-1.5">
                         {status === "DRAFT" && <ActionBtn id={e.id} to="RUNNING" label="▶ Mulai siklus 30 hari" />}
                         {status === "RUNNING" && (

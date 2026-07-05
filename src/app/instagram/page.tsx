@@ -18,7 +18,7 @@ import {
   detectOrganicWinners,
   nonFollowerTrend,
 } from "@/lib/engine/igDiagnosis";
-import { decideContentMix, decideIgWinner } from "@/lib/engine/verdicts";
+import { decideContentMix, decideIgWinner, rankAdCandidates } from "@/lib/engine/verdicts";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,15 @@ export default async function InstagramPage() {
   const mixVerdict = lock.locked ? null : decideContentMix(mix, inputs.length);
   const winners = detectOrganicWinners(inputs);
   const winnerIds = new Set(winners.winners.map((w) => w.postId));
+  const candidateScores = new Map(
+    rankAdCandidates(
+      winners.winners.map((w) => ({
+        post: inputs.find((i) => i.id === w.postId)!,
+        signalScore: posts.find((p) => p.id === w.postId)!.signalScore,
+        reasons: w.reasons,
+      })),
+    ).map((r) => [r.postId, r.score]),
+  );
   const byFormat = compareByDimension(inputs, "format");
   const byPillar = compareByDimension(inputs, "pillar");
 
@@ -170,7 +179,14 @@ export default async function InstagramPage() {
               const verdict = lock.locked ? null : decideIgWinner(input, w.reasons, inputs.length);
               return (
                 <li key={w.postId} className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
-                  <div className="font-semibold text-gray-900">🏆 {post.hook}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-gray-900">🏆 {post.hook}</span>
+                    {candidateScores.has(w.postId) && (
+                      <span className="whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Skor kandidat iklan — pengurut antar-pemenang, bukan prediksi ROI">
+                        skor kandidat {candidateScores.get(w.postId)}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-xs text-gray-600">{w.reasons.join(" · ")}</div>
                   {verdict ? (
                     <div className="mt-2 space-y-1">

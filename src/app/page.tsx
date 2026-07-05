@@ -27,14 +27,35 @@ export default async function DashboardPage() {
       />
 
       {/* ── Metrik UTAMA (bulan berjalan) ── */}
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tile label="Lead Berkualitas" value={String(d.primary.qualifiedLeads)} />
         <Tile label="Survei" value={String(d.primary.surveys)} />
         <Tile label="Proposal" value={String(d.primary.proposals)} />
         <Tile label="Nilai Closing" value={formatJuta(d.primary.closingValueJuta)} />
         <Tile label="Nilai Pipeline" value={formatJuta(d.primary.pipelineValueJuta)} accent />
         <Tile label="CPQL Iklan" value={d.primary.cpqlRibu != null ? formatRibu(d.primary.cpqlRibu) : "—"} />
+        <Tile label="Biaya/Survei (iklan)" value={d.primary.costPerSurveyRibu != null ? formatRibu(d.primary.costPerSurveyRibu) : "—"} />
+        <Tile label="Biaya/Proposal (iklan)" value={d.primary.costPerProposalRibu != null ? formatRibu(d.primary.costPerProposalRibu) : "—"} />
       </div>
+
+      {d.auditAging.length > 0 && (
+        <div className="mb-6 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm">
+          <p className="font-bold text-amber-800">⏳ Audit kadaluarsa — jalankan ulang</p>
+          {d.auditAging.map((a) => (
+            <p key={a.type} className="mt-0.5 text-xs text-amber-700">
+              {a.type === "META_ACCOUNT" ? "Audit Akun Meta" : a.type === "REKOMENDASI" ? "Audit Rekomendasi" : "Audit Tracking"}{" "}
+              berumur {a.aging.ageDays} hari (ambang {a.aging.maxDays}). Status HIJAU sudah diturunkan ke
+              KUNING — kondisi akun bisa berubah tanpa pemberitahuan.
+            </p>
+          ))}
+        </div>
+      )}
+
+      {d.backup.due && (
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          💾 {d.backup.message}
+        </div>
+      )}
 
       {d.lock.locked && d.lock.lockVerdict && (
         <div className="mb-6">
@@ -145,6 +166,7 @@ export default async function DashboardPage() {
                 <li key={f.id} className="rounded-lg border border-gray-100 bg-gray-50 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <Link href="/leads" className="font-semibold underline-offset-2 hover:underline">
+                      {f.noorHandle && <span title={f.noorReason ?? undefined}>👑 </span>}
                       {f.name}
                     </Link>
                     <span
@@ -211,7 +233,14 @@ export default async function DashboardPage() {
             <ul className="space-y-2">
               {d.winners.slice(0, 3).map((w) => (
                 <li key={w.postId} className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm">
-                  <div className="font-semibold">🏆 {w.hook}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold">🏆 {w.hook}</span>
+                    {w.candidateScore != null && (
+                      <span className="whitespace-nowrap rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Skor kandidat iklan — heuristik pengurut antar-pemenang, bukan prediksi ROI">
+                        skor {w.candidateScore}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-1 flex items-center gap-2">
                     <DecisionChip decision={w.verdict.decision} />
                     <span className="text-[10px] text-gray-500">keyakinan {w.verdict.confidence.toLowerCase()}</span>

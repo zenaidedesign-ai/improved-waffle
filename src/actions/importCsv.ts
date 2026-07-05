@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { mapPostToInput } from "@/lib/data";
 import { IG_FORMAT, LEAD_SOURCE, LEAD_STATUS, PILAR } from "@/lib/domain/enums";
 import { computeSignalScore } from "@/lib/engine/igDiagnosis";
+import { weekStartOf } from "@/lib/engine/warRoom";
 
 const num = z
   .union([z.coerce.number(), z.literal(""), z.null(), z.undefined()])
@@ -55,6 +56,7 @@ export async function importCsvRows(
   rows: unknown[],
   fileName: string,
   origin: "CSV" | "GOOGLE_SHEET" = "CSV",
+  forceDuplicates = false, // khusus LEAD: impor juga baris yang terdeteksi duplikat
 ): Promise<ImportResult> {
   if (rows.length === 0) throw new Error("Tidak ada baris valid untuk diimpor.");
   if (rows.length > 2000) throw new Error("Maksimal 2000 baris per impor.");
@@ -92,8 +94,14 @@ export async function importCsvRows(
   } else if (type === "LEAD") {
     for (const raw of rows) {
       const r = leadRow.parse(raw);
-      const dup = await db.lead.findFirst({ where: { name: r.nama } });
-      if (dup) { skipped.push(r.nama); continue; }
+      // Duplikat = nama + sumber + minggu masuk yang sama (bukan nama saja —
+      // dua "Bu Ani" berbeda minggu/sumber adalah dua lead nyata).
+      const wk = weekStartOf(r.tanggal_masuk ?? new Date());
+      const wkEnd = new Date(wk.getTime() + 7 * 24 * 3600 * 1000);
+      const dup = await db.lead.findFirst({
+        where: { name: r.nama, sourceType: r.sumber, createdAt: { gte: wk, lt: wkEnd } },
+      });
+      if (dup && !forceDuplicates) { skipped.push(`${r.nama} (${r.sumber}, minggu sama)`); continue; }
       const signals = {
         signalBudget: r.sinyal_budget ?? 0, signalProjectType: r.sinyal_proyek ?? 0,
         signalLocation: r.sinyal_lokasi ?? 0, signalUrgency: r.sinyal_urgensi ?? 0,

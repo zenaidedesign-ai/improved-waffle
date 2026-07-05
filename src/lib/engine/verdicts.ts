@@ -41,6 +41,36 @@ export function decideIgWinner(
   };
 }
 
+export interface AdCandidate {
+  postId: string;
+  score: number; // 0–100, relatif antar-kandidat — alat pengurut, bukan klaim absolut
+  reasons: string[];
+}
+
+/**
+ * Peringkat kandidat iklan di antara pemenang organik.
+ * Komposit: 60% skor sinyal (save/share/WA per reach) + 40% lead berkualitas
+ * relatif terhadap kandidat terbaik. Heuristik pengurut — bukan prediksi ROI.
+ */
+export function rankAdCandidates(
+  candidates: Array<{ post: IgPostInput; signalScore: number | null; reasons: string[] }>,
+): AdCandidate[] {
+  const usable = candidates.filter((c) => c.signalScore !== null);
+  if (usable.length === 0) return [];
+  const maxSignal = Math.max(...usable.map((c) => c.signalScore!), 1);
+  const maxQualified = Math.max(...usable.map((c) => c.post.qualifiedLeadsAttributed), 1);
+  return usable
+    .map((c) => ({
+      postId: c.post.id,
+      score:
+        Math.round(
+          ((c.signalScore! / maxSignal) * 60 + (c.post.qualifiedLeadsAttributed / maxQualified) * 40) * 10,
+        ) / 10,
+      reasons: c.reasons,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
 /** Campuran konten terlalu berat portofolio → vonis perbaiki kreatif (strategi konten). */
 export function decideContentMix(mix: MixResult, totalPosts: number): VerdictProposal | null {
   if (mix.insufficient || !mix.tooPortfolioHeavy) return null;

@@ -177,6 +177,25 @@ export function detectCampaignConflicts(c: CampaignConflictInput): SourceConflic
   return out;
 }
 
+// ── Pengingat cadangan mingguan (DB = satu file SQLite) ──
+export function backupDue(lastExportAt: Date | null, now: Date, maxDays: number): {
+  due: boolean;
+  message: string | null;
+} {
+  if (lastExportAt === null) {
+    return {
+      due: true,
+      message: "Belum pernah ada cadangan. Basis data = SATU file SQLite — ekspor CSV sekarang di menu Impor & Ekspor.",
+    };
+  }
+  const ageDays = Math.floor((now.getTime() - lastExportAt.getTime()) / (24 * 3600 * 1000));
+  if (ageDays <= maxDays) return { due: false, message: null };
+  return {
+    due: true,
+    message: `Cadangan CSV terakhir ${ageDays} hari lalu (ambang ${maxDays} hari). Ekspor ulang di menu Impor & Ekspor.`,
+  };
+}
+
 // ── Kalimat kebijakan tetap (dipakai seragam di seluruh UI) ──
 export const TRUTH_PHRASES = {
   notEnough: "Data andal belum cukup.",

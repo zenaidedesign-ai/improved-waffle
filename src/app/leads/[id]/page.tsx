@@ -53,8 +53,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={lead.name}
-        subtitle={`${TRIAGE_LABEL[t.triage]} — ${t.reason} · Prob. closing (estimasi kasar): ${t.closingProbabilityPct}%`}
+        title={`${t.noorHandle ? "👑 " : ""}${lead.name}`}
+        subtitle={`${TRIAGE_LABEL[t.triage]} — ${t.reason} · Prob. closing (estimasi kasar): ${t.closingProbabilityPct}%${t.noorHandle ? ` · TANGANI NOOR SENDIRI (${t.noorReason})` : ""}`}
       />
 
       <Card title="Ubah status cepat" className="mb-4">

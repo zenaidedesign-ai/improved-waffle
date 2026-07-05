@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { buildCampaignFunnel, getGateStatus } from "@/lib/data";
 import { CONFIG } from "@/lib/domain/config";
 import { AD_CHANNEL, CAMPAIGN_OBJECTIVE, CAMPAIGN_STATUS } from "@/lib/domain/enums";
-import { computeCostChain, decideCampaign } from "@/lib/engine/adsRescue";
+import { assessDataQuality, computeCostChain, decideCampaign } from "@/lib/engine/adsRescue";
 import { recordVerdict } from "@/lib/verdictLog";
 
 const nonNegInt = z.coerce.number().int().min(0);
@@ -89,11 +89,16 @@ export async function recordCampaignVerdict(campaignId: string): Promise<void> {
   });
   const gates = await getGateStatus();
   const chain = computeCostChain(buildCampaignFunnel(campaign));
+  const dq = assessDataQuality(
+    campaign.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })),
+    new Date(),
+  );
   const verdict = decideCampaign(
     chain,
     gates.gate0,
     gates.gate1,
     campaign.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
+    dq,
   );
   await recordVerdict("CAMPAIGN", verdict, {
     campaignId,

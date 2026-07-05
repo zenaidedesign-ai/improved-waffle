@@ -10,6 +10,7 @@ export function CsvImport() {
   const router = useRouter();
   const [type, setType] = useState<CsvType>("IG_POST");
   const [origin, setOrigin] = useState<"CSV" | "GOOGLE_SHEET">("CSV");
+  const [forceDup, setForceDup] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [unmapped, setUnmapped] = useState<string[]>([]);
@@ -90,6 +91,14 @@ export function CsvImport() {
         />
       </label>
 
+      {type === "LEAD" && (
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input type="checkbox" checked={forceDup} onChange={(e) => setForceDup(e.target.checked)} />
+          Paksa impor baris yang terdeteksi duplikat (nama + sumber + minggu sama) — pakai hanya jika
+          Anda yakin itu lead yang berbeda.
+        </label>
+      )}
+
       {unmapped.length > 0 && (
         <p className="text-xs text-amber-700">
           Kolom tidak dikenali & diabaikan: {unmapped.join(", ")}
@@ -134,6 +143,7 @@ export function CsvImport() {
                     rows.filter((r) => (r[requiredFirst] ?? "").trim() !== ""),
                     fileName ?? "tanpa-nama.csv",
                     origin,
+                    type === "LEAD" ? forceDup : false,
                   );
                   setResult(res);
                   setRows([]);
