@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, EmptyState, GateLockBanner, PageHeader, VerdictCard } from "@/components/ui";
+import { Card, EmptyState, GateLockBanner, PageHeader, SensitiveDataNotice, VerdictCard } from "@/components/ui";
 import { buildCampaignFunnel, getGateStatus } from "@/lib/data";
 import { db } from "@/lib/db";
 import { CONFIG } from "@/lib/domain/config";
@@ -58,6 +58,8 @@ export default async function KampanyePage() {
           </Link>
         }
       />
+
+      <SensitiveDataNotice />
 
       {lock.locked && lock.lockVerdict && (
         <div className="mb-6">

@@ -322,6 +322,42 @@ await check("top 5 penuh; keputusan war room tercatat di sesi", async () => {
 });
 await page.screenshot({ path: SHOTS + "/09-home-final.png", fullPage: true });
 
+// 12. Infrastructure hardening: peringatan sensitif, pusat cadangan, konfirmasi hapus contoh
+await check("hardening: notifikasi sensitif di layar rawan + jujur soal tanpa login", async () => {
+  for (const path of ["/leads", "/kampanye", "/war-room", "/knowledge", "/pilot", "/impor"]) {
+    await page.goto(BASE + path);
+    const body = await page.textContent("body");
+    if (!body.includes("data bisnis sensitif")) throw new Error(`peringatan sensitif hilang di ${path}`);
+    if (!body.includes("belum punya login")) throw new Error(`kejujuran 'belum punya login' hilang di ${path}`);
+  }
+});
+
+await check("hardening: pusat cadangan + unduhan DB valid + peringatan restore", async () => {
+  await page.goto(BASE + "/impor");
+  const body = await page.textContent("body");
+  for (const s of ["Pusat Cadangan", "Unduh file database", "Peringatan restore", "Jangan dibagikan", "Rutinitas mingguan"]) {
+    if (!body.includes(s)) throw new Error(`bagian hilang: ${s}`);
+  }
+  const resp = await page.request.get(BASE + "/api/backup/db");
+  if (resp.status() !== 200) throw new Error(`unduhan DB gagal: HTTP ${resp.status()}`);
+  const buf = await resp.body();
+  if (!buf.subarray(0, 15).toString("utf8").startsWith("SQLite format 3"))
+    throw new Error("file unduhan bukan database SQLite yang valid");
+  // Unduhan cadangan harus menstempel waktu cadangan (banner tagihan hilang).
+  await page.goto(BASE + "/impor");
+  const after = await page.textContent("body");
+  if (!after.includes("Cadangan terakhir")) throw new Error("stempel cadangan terakhir tidak tercatat");
+});
+
+await check("hardening: hapus data contoh butuh konfirmasi & transparan jumlah baris", async () => {
+  await page.goto(BASE + "/");
+  const body = await page.textContent("body");
+  if (!body.includes("baris data contoh")) throw new Error("hitungan baris contoh hilang");
+  if (!body.includes("Saya paham")) throw new Error("centang konfirmasi hilang");
+  const confirmBox = await page.$('form input[type="checkbox"][name="confirm"][required]');
+  if (!confirmBox) throw new Error("checkbox konfirmasi wajib tidak ditemukan");
+});
+
 await browser.close();
 console.log(results.join("\n"));
 const fails = results.filter((r) => r.startsWith("FAIL"));

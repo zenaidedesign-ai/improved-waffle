@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { startPilot } from "@/actions/pilot";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader, SensitiveDataNotice } from "@/components/ui";
 import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
 import { computePilotProgress, pilotDay } from "@/lib/engine/pilot";
@@ -56,6 +56,8 @@ export default async function PilotPage() {
         title="Pilot Data Nyata — 14 Hari"
         subtitle="Tujuan pilot: membuktikan sistem dengan data Zenaide sungguhan, lalu menyetel ambang di hari ke-14. Data contoh TIDAK dihitung sebagai kemajuan. Runbook lengkap: docs/PILOT-RUNBOOK.md"
       />
+
+      <SensitiveDataNotice />
 
       {gate.locked && (
         <div className="mb-6 rounded-lg border-2 border-red-300 bg-red-50 p-4">

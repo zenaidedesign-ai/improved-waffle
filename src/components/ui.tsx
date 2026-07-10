@@ -94,6 +94,22 @@ export function Card({ title, children, className = "" }: { title?: string; chil
   );
 }
 
+/**
+ * Peringatan layar sensitif — JUJUR, bukan keamanan palsu: aplikasi ini BELUM punya login,
+ * jadi satu-satunya perlindungan saat ini adalah perangkat & jaringan yang dipakai.
+ * Rencana auth sesungguhnya: docs/AUTH-READINESS.md.
+ */
+export function SensitiveDataNotice() {
+  return (
+    <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+      🔐 Layar ini berisi <b>data bisnis sensitif</b> (lead, nilai proyek, strategi). Sistem ini{" "}
+      <b>belum punya login</b> — siapa pun yang bisa membuka aplikasi ini bisa melihat semuanya.
+      Jangan buka di perangkat atau jaringan yang tidak tepercaya, dan jangan bagikan alamat
+      aplikasi ke luar tim inti.
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">

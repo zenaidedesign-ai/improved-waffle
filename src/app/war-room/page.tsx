@@ -1,6 +1,6 @@
 import { setDecisionStatus } from "@/actions/warRoom";
 import { WarRoomForm } from "@/components/WarRoomForm";
-import { Card, DecisionChip, GateLockBanner, PageHeader } from "@/components/ui";
+import { Card, DecisionChip, GateLockBanner, PageHeader, SensitiveDataNotice } from "@/components/ui";
 import { currentWeekStart, getGateStatus, getWeekMetrics } from "@/lib/data";
 import { db } from "@/lib/db";
 import { CONFIG } from "@/lib/domain/config";
@@ -36,6 +36,8 @@ export default async function WarRoomPage() {
         title="War Room Mingguan"
         subtitle={`Minggu mulai ${formatTanggal(weekStart)}. Baca metrik UTAMA dulu, diagnostik kedua — lalu komit maksimal ${CONFIG.warRoomMaxDecisions} keputusan untuk minggu depan.`}
       />
+
+      <SensitiveDataNotice />
 
       {lock.locked && lock.lockVerdict && (
         <div className="mb-6">

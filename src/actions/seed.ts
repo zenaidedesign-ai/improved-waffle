@@ -86,7 +86,31 @@ export async function loadExampleData(): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-export async function deleteExampleData(): Promise<void> {
+/** Hitung baris contoh per tabel — dipakai layar sebelum menawarkan penghapusan. */
+export async function countExampleRows(): Promise<{ total: number; perTable: Array<{ table: string; n: number }> }> {
+  const entries: Array<[string, number]> = [
+    ["Lead", await db.lead.count({ where: { isExample: true } })],
+    ["Post IG", await db.igPost.count({ where: { isExample: true } })],
+    ["Kampanye", await db.campaign.count({ where: { isExample: true } })],
+    ["Audit", await db.auditRun.count({ where: { isExample: true } })],
+    ["Snapshot IG", await db.igAccountSnapshot.count({ where: { isExample: true } })],
+    ["Kompetitor", await db.competitor.count({ where: { isExample: true } })],
+    ["Eksperimen", await db.experiment.count({ where: { isExample: true } })],
+    ["Pain point", await db.painPoint.count({ where: { isExample: true } })],
+    ["Keberatan", await db.objection.count({ where: { isExample: true } })],
+    ["Sesi war room", await db.warRoomSession.count({ where: { isExample: true } })],
+  ];
+  const perTable = entries.filter(([, n]) => n > 0).map(([table, n]) => ({ table, n }));
+  return { total: perTable.reduce((s, t) => s + t.n, 0), perTable };
+}
+
+/**
+ * Penghapusan destruktif WAJIB dikonfirmasi: tanpa centang "confirm" dari form,
+ * aksi ini tidak menghapus apa pun. Hanya baris isExample:true yang tersentuh —
+ * data asli owner secara struktural tidak mungkin ikut terhapus lewat jalur ini.
+ */
+export async function deleteExampleData(formData: FormData): Promise<void> {
+  if (formData.get("confirm") !== "on") return; // tidak dikonfirmasi ⇒ tidak ada yang dihapus
   // Urutan sesuai dependensi relasi.
   await db.verdict.deleteMany({ where: { isExample: true } });
   await db.warRoomSession.deleteMany({ where: { isExample: true } });

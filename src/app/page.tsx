@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { deleteExampleData, loadExampleData } from "@/actions/seed";
+import { countExampleRows, deleteExampleData, loadExampleData } from "@/actions/seed";
 import { Card, DecisionChip, GateLockBanner, PageHeader, StatusChip, VerdictCard } from "@/components/ui";
 import { getDashboardData } from "@/lib/dashboard";
 import { DataTruthPanel } from "@/components/DataTruthPanel";
@@ -17,7 +17,7 @@ import { formatAngka, formatJuta, formatRibu } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [d, truth] = await Promise.all([getDashboardData(), getTruthPanelData()]);
+  const [d, truth, contoh] = await Promise.all([getDashboardData(), getTruthPanelData(), countExampleRows()]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -292,17 +292,31 @@ export default async function DashboardPage() {
       </div>
 
       {d.hasAnyData && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <form action={loadExampleData}>
             <button className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100">
               Muat ulang data contoh
             </button>
           </form>
-          <form action={deleteExampleData}>
-            <button className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100">
-              Hapus data contoh
-            </button>
-          </form>
+          {contoh.total > 0 ? (
+            <form action={deleteExampleData} className="rounded-lg border border-gray-300 p-2.5">
+              <p className="text-xs text-gray-600">
+                <b>{contoh.total} baris data contoh</b> terpasang (
+                {contoh.perTable.map((t) => `${t.table} ${t.n}`).join(" · ")}). Data contoh = baris
+                berlabel [CONTOH] yang dimuat tombol seed — bukan data yang Anda input sendiri.
+              </p>
+              <label className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-600">
+                <input type="checkbox" name="confirm" required className="mt-0.5" />
+                Saya paham: HANYA baris contoh yang dihapus; semua data asli tetap utuh. Aksi ini tidak
+                bisa dibatalkan (data contoh bisa dimuat ulang kapan saja).
+              </label>
+              <button className="mt-1.5 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+                Hapus {contoh.total} baris data contoh
+              </button>
+            </form>
+          ) : (
+            <span className="self-center text-xs text-emerald-600">✅ Tidak ada data contoh terpasang — semua yang tampil adalah data nyata.</span>
+          )}
         </div>
       )}
     </div>

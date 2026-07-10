@@ -1,5 +1,5 @@
 import { addEvidence, deleteLearning, saveLearning, setFalsifier, setLearningStrength } from "@/actions/knowledge";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { Card, EmptyState, PageHeader, SensitiveDataNotice } from "@/components/ui";
 import { getDashboardData } from "@/lib/dashboard";
 import { isLeadQualified, mapPostToInput } from "@/lib/data";
 import { db } from "@/lib/db";
@@ -119,6 +119,8 @@ export default async function KnowledgePage() {
         title="Marketing Knowledge Engine"
         subtitle="Learning yang bisa dipakai ulang — setiap insight wajib bawa data pendukung, sumber, tingkat kekuatan, dan FALSIFIER (syarat gugurnya sendiri). Satu kejadian BUKAN kebenaran: saran otomatis maksimal 'Berkembang'; 'Terbukti' hanya lewat keputusan owner atas pola yang berulang, dan hanya untuk data internal."
       />
+
+      <SensitiveDataNotice />
 
       {gate.locked && (
         <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">

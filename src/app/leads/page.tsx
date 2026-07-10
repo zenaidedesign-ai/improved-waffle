@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { touchLeadContact } from "@/actions/lead";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { Card, EmptyState, PageHeader, SensitiveDataNotice } from "@/components/ui";
 import { db } from "@/lib/db";
 import { formatJuta, formatTanggal } from "@/lib/format";
 import {
@@ -62,6 +62,8 @@ export default async function LeadsPage() {
           </Link>
         }
       />
+
+      <SensitiveDataNotice />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <Card title="Follow-up hari ini">

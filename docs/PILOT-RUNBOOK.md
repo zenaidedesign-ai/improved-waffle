@@ -62,7 +62,8 @@ Selama 14 hari pilot, sistem DIKUNCI dari pembangunan lanjutan:
 6. **Ledger bukti:** untuk learning yang sudah ada, catat bukti minggu ini di expander
    "Kenapa percaya ini?" — mendukung ATAU menentang, dua-duanya dicatat. Learning dengan
    ≥ 2 bukti internal mendukung = "pola berulang" yang dihitung Gerbang Fase B.
-7. Ekspor CSV cadangan (Impor & Ekspor) — DB hanya satu file SQLite.
+7. Buka **Pusat Cadangan** (Impor & Ekspor): unduh file .db + 3 CSV, simpan ke folder pribadi
+   tersinkron cloud — DB hanya satu file SQLite. Detail: `docs/OPERATIONS-SAFETY.md`.
 
 ## Hari 14 — Tuning Ambang (60 menit)
 
