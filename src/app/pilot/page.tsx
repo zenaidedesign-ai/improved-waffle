@@ -7,6 +7,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
 import { computePilotProgress, pilotDay } from "@/lib/engine/pilot";
+import { getPhaseBGate } from "@/lib/pilotGate";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function PilotPage() {
     pilotLearnings,
   });
   const day = pilotDay(startedSetting ? new Date(startedSetting.value) : null, now);
+  const { gate } = await getPhaseBGate(now);
 
   const day1Items: Array<{ label: string; done: boolean; href: string }> = [
     { label: "Jalankan ketiga audit (Akun Meta, Rekomendasi, Tracking) dengan jawaban NYATA", done: auditTypes.length >= 3, href: "/audit/meta-account" },
@@ -54,6 +56,18 @@ export default async function PilotPage() {
         title="Pilot Data Nyata — 14 Hari"
         subtitle="Tujuan pilot: membuktikan sistem dengan data Zenaide sungguhan, lalu menyetel ambang di hari ke-14. Data contoh TIDAK dihitung sebagai kemajuan. Runbook lengkap: docs/PILOT-RUNBOOK.md"
       />
+
+      {gate.locked && (
+        <div className="mb-6 rounded-lg border-2 border-red-300 bg-red-50 p-4">
+          <div className="text-sm font-black text-red-800">🔒 PILOT LEARNING MODE — sistem dikunci dari pembangunan lanjutan</div>
+          <p className="mt-1 text-sm text-red-700">{gate.lockMessage}</p>
+          <p className="mt-1 text-xs text-red-500">
+            Yang boleh selama pilot: input data nyata, catat learning [PILOT] (dengan falsifier), catat bukti
+            di ledger Knowledge. Yang TIDAK boleh: menaikkan belief ke Terbukti tanpa bukti berulang,
+            mengubah threshold di config, membangun Fase B / modul baru / API.
+          </p>
+        </div>
+      )}
 
       {exampleLeads > 0 && (
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
@@ -109,6 +123,35 @@ export default async function PilotPage() {
         <p className="mt-2 text-xs text-gray-400">
           Dua kriteria terakhir sengaja tidak bisa dicentang sistem — kejujuran penilaian ada di Noor.
         </p>
+      </Card>
+
+      <Card
+        title={`Gerbang Fase B (${gate.autoMet}/${gate.totalAuto} syarat terukur + hari ${gate.daysDone ? "✅" : "⬜"})`}
+        className="mb-6 border-2 border-red-200"
+      >
+        <p className="mb-2 text-xs text-gray-500">
+          Fase B = skoring & lifecycle belief otomatis. Gerbang ini yang menahannya: semua syarat di bawah
+          harus terpenuhi DAN pilot berjalan penuh 14 hari. Tidak ada jalan pintas — sistem yang belum
+          melihat data nyata tidak berhak menilai belief secara otomatis.
+        </p>
+        <ul className="space-y-1.5 text-sm">
+          {gate.conditions.map((c) => (
+            <li key={c.key} className="flex items-start gap-2">
+              <span className={c.met ? "text-emerald-600" : "text-gray-300"}>{c.met ? "✅" : "⬜"}</span>
+              <span>
+                {c.label}{" "}
+                <b>{c.manual ? "(dinilai Noor di hari 14)" : `${c.actual}/${c.target}`}</b>
+                {c.note && <span className="block text-xs text-gray-400">{c.note}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {!gate.locked && (
+          <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+            Semua syarat terukur terpenuhi & 14 hari selesai. Sisa keputusan ada di Noor: kalau syarat
+            manual juga beres, minta Fase B secara eksplisit.
+          </p>
+        )}
       </Card>
 
       <Card title="Hari 1 — fondasi (60–90 menit)" className="mb-6">

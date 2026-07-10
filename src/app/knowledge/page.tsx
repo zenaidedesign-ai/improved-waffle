@@ -4,6 +4,7 @@ import { getDashboardData } from "@/lib/dashboard";
 import { isLeadQualified, mapPostToInput } from "@/lib/data";
 import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
+import { getPhaseBGate } from "@/lib/pilotGate";
 import { compareByDimension } from "@/lib/engine/igDiagnosis";
 import {
   buildProvenance,
@@ -25,7 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function KnowledgePage() {
-  const [learnings, posts, leads, d] = await Promise.all([
+  const [learnings, posts, leads, d, { gate }] = await Promise.all([
     db.learning.findMany({
       orderBy: { updatedAt: "desc" },
       include: {
@@ -36,6 +37,7 @@ export default async function KnowledgePage() {
     db.igPost.findMany({ include: { leads: true } }),
     db.lead.findMany(),
     getDashboardData(),
+    getPhaseBGate(),
   ]);
 
   const pillarStats = compareByDimension(posts.map(mapPostToInput), "pillar").map((r) => ({
@@ -117,6 +119,14 @@ export default async function KnowledgePage() {
         title="Marketing Knowledge Engine"
         subtitle="Learning yang bisa dipakai ulang — setiap insight wajib bawa data pendukung, sumber, tingkat kekuatan, dan FALSIFIER (syarat gugurnya sendiri). Satu kejadian BUKAN kebenaran: saran otomatis maksimal 'Berkembang'; 'Terbukti' hanya lewat keputusan owner atas pola yang berulang, dan hanya untuk data internal."
       />
+
+      {gate.locked && (
+        <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          🔒 <b>Pilot Learning Mode.</b> {gate.lockMessage} Selama pilot: catat learning [PILOT] dan bukti
+          di ledger sebanyak-banyaknya — tapi kenaikan ke <b>Terbukti</b> menunggu pola berulang dari data
+          nyata. Status gerbang lengkap ada di layar <a href="/pilot" className="font-semibold underline">Pilot 14 Hari</a>.
+        </div>
+      )}
 
       <Card title={`Saran dari data (${freshSuggestions.length})`} className="mb-6">
         {freshSuggestions.length === 0 ? (

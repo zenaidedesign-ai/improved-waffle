@@ -282,6 +282,20 @@ await check("pilot: data contoh tidak dihitung, checklist & mulai pilot jalan", 
 });
 await page.screenshot({ path: SHOTS + "/16-pilot.png", fullPage: true });
 
+await check("pilot lock mode: banner kunci Fase B + gerbang 8 syarat", async () => {
+  const body = await page.textContent("body");
+  if (!body.includes("Fase B belum boleh dimulai. Sistem masih mengumpulkan bukti nyata."))
+    throw new Error("pesan kunci Fase B hilang dari layar pilot");
+  if (!body.includes("Jangan naikkan belief atau threshold")) throw new Error("kalimat larangan promosi belief hilang");
+  if (!body.includes("Gerbang Fase B")) throw new Error("kartu gerbang Fase B hilang");
+  if (!body.includes("Pola berulang dari data nyata")) throw new Error("syarat pola berulang (ledger Fase A) hilang");
+  if (!body.includes("Data contoh dihapus")) throw new Error("syarat bersih data contoh hilang");
+  // Banner yang sama harus mengunci layar Knowledge dari promosi belief.
+  await page.goto(BASE + "/knowledge");
+  const kb = await page.textContent("body");
+  if (!kb.includes("Fase B belum boleh dimulai")) throw new Error("banner kunci tidak tampil di Knowledge");
+});
+
 // 10. War room — compare + komit keputusan
 await check("war room: compare + komit 2 keputusan", async () => {
   await page.goto(BASE + "/war-room");

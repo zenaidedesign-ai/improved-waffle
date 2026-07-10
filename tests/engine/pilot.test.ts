@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { computePilotProgress, pilotDay, type PilotCounts } from "../../src/lib/engine/pilot";
+import {
+  computePilotProgress,
+  PHASE_B_LOCK_MESSAGE,
+  phaseBGate,
+  pilotDay,
+  type PhaseBGateInput,
+  type PilotCounts,
+} from "../../src/lib/engine/pilot";
 
 const counts = (over: Partial<PilotCounts> = {}): PilotCounts => ({
   realLeads: 0, realPosts: 0, realAdsCsvImports: 0, warRoomSessions: 0,
@@ -26,6 +33,63 @@ describe("computePilotProgress", () => {
     const manual = p.criteria.filter((c) => c.manual);
     expect(manual).toHaveLength(2);
     expect(manual.every((c) => !c.met)).toBe(true);
+  });
+});
+
+const gateInput = (over: Partial<PhaseBGateInput> = {}): PhaseBGateInput => ({
+  realLeads: 0, realPosts: 0, realAdsCsvImports: 0, realWarRooms: 0,
+  pilotLearnings: 0, repeatedRealPatterns: 0, exampleRowsRemaining: 0,
+  pilotDayNumber: null, ...over,
+});
+
+const ALL_MET: Partial<PhaseBGateInput> = {
+  realLeads: 50, realPosts: 10, realAdsCsvImports: 1, realWarRooms: 1,
+  pilotLearnings: 5, repeatedRealPatterns: 2, exampleRowsRemaining: 0, pilotDayNumber: 14,
+};
+
+describe("phaseBGate — Pilot Lock Mode", () => {
+  it("nol data ⇒ terkunci, dengan pesan kunci persis dari owner", () => {
+    const g = phaseBGate(gateInput());
+    expect(g.locked).toBe(true);
+    expect(g.lockMessage).toBe(
+      "Fase B belum boleh dimulai. Sistem masih mengumpulkan bukti nyata. Jangan naikkan belief atau threshold sebelum 14 hari data pilot selesai.",
+    );
+    expect(g.lockMessage).toBe(PHASE_B_LOCK_MESSAGE);
+  });
+  it("semua syarat terukur + hari ≥ 14 ⇒ gerbang terbuka", () => {
+    const g = phaseBGate(gateInput(ALL_MET));
+    expect(g.autoMet).toBe(g.totalAuto);
+    expect(g.daysDone).toBe(true);
+    expect(g.locked).toBe(false);
+  });
+  it("semua syarat terpenuhi TAPI baru hari 13 ⇒ tetap terkunci — 14 hari tidak bisa dipercepat", () => {
+    const g = phaseBGate(gateInput({ ...ALL_MET, pilotDayNumber: 13 }));
+    expect(g.locked).toBe(true);
+  });
+  it("pilot belum dimulai ⇒ terkunci walau angka lain penuh", () => {
+    const g = phaseBGate(gateInput({ ...ALL_MET, pilotDayNumber: null }));
+    expect(g.locked).toBe(true);
+  });
+  it("[PILOT] butuh ≥ 5 (lebih ketat dari kriteria pilot); 4 belum cukup", () => {
+    const g = phaseBGate(gateInput({ ...ALL_MET, pilotLearnings: 4 }));
+    expect(g.conditions.find((c) => c.key === "pilotNotes")?.met).toBe(false);
+    expect(g.locked).toBe(true);
+  });
+  it("pola berulang butuh ≥ 2 learning ber-bukti ganda dari ledger nyata", () => {
+    const g = phaseBGate(gateInput({ ...ALL_MET, repeatedRealPatterns: 1 }));
+    expect(g.conditions.find((c) => c.key === "patterns")?.met).toBe(false);
+    expect(g.locked).toBe(true);
+  });
+  it("satu baris data contoh tersisa ⇒ syarat bersih-contoh gagal", () => {
+    const g = phaseBGate(gateInput({ ...ALL_MET, exampleRowsRemaining: 1 }));
+    expect(g.conditions.find((c) => c.key === "noExample")?.met).toBe(false);
+    expect(g.locked).toBe(true);
+  });
+  it("penelusuran triase oleh Noor = manual, TIDAK pernah otomatis lolos", () => {
+    const g = phaseBGate(gateInput(ALL_MET));
+    const m = g.conditions.find((c) => c.key === "triageReview")!;
+    expect(m.manual).toBe(true);
+    expect(m.met).toBe(false); // sistem tidak berhak mencentang ini
   });
 });
 

@@ -56,6 +56,75 @@ export function computePilotProgress(c: PilotCounts): PilotProgress {
   return { criteria, metCount, totalAuto: auto.length, ready: metCount === auto.length };
 }
 
+// ── Gerbang Fase B — Pilot Lock Mode ──
+// Fase B (skoring + lifecycle otomatis) DILARANG dimulai sebelum semua syarat
+// data nyata di bawah terpenuhi DAN pilot 14 hari selesai. Gerbang ini murni
+// pembaca keadaan: dia tidak membangun apa pun, hanya menolak overbuilding.
+
+export const PHASE_B_LOCK_MESSAGE =
+  "Fase B belum boleh dimulai. Sistem masih mengumpulkan bukti nyata. " +
+  "Jangan naikkan belief atau threshold sebelum 14 hari data pilot selesai.";
+
+export interface PhaseBGateInput {
+  realLeads: number;
+  realPosts: number;
+  realAdsCsvImports: number;
+  realWarRooms: number; // sesi war room non-contoh
+  pilotLearnings: number; // learning [PILOT] — ketidaksetujuan ATAU konfirmasi
+  repeatedRealPatterns: number; // learning nyata dengan ≥2 bukti MENDUKUNG DATA_INTERNAL nyata di ledger
+  exampleRowsRemaining: number; // baris contoh tersisa (lead + post + kampanye)
+  pilotDayNumber: number | null; // null = pilot belum dimulai
+}
+
+export interface PhaseBGate {
+  conditions: PilotCriterion[];
+  autoMet: number;
+  totalAuto: number;
+  daysDone: boolean; // pilot sudah berjalan ≥ 14 hari
+  locked: boolean; // true = Fase B DILARANG — ada syarat terukur yang belum terpenuhi
+  lockMessage: string;
+}
+
+export function phaseBGate(i: PhaseBGateInput): PhaseBGate {
+  const conditions: PilotCriterion[] = [
+    { key: "leads", label: "Lead nyata tercatat", target: 50, actual: i.realLeads, met: i.realLeads >= 50 },
+    { key: "posts", label: "Post Instagram nyata tercatat", target: 10, actual: i.realPosts, met: i.realPosts >= 10 },
+    { key: "adsCsv", label: "CSV Ads Manager nyata diimpor", target: 1, actual: i.realAdsCsvImports, met: i.realAdsCsvImports >= 1 },
+    { key: "warRoom", label: "War Room mingguan dari data nyata", target: 1, actual: i.realWarRooms, met: i.realWarRooms >= 1 },
+    {
+      key: "pilotNotes", label: "Ketidaksetujuan/konfirmasi [PILOT] tercatat di Knowledge", target: 5,
+      actual: i.pilotLearnings, met: i.pilotLearnings >= 5,
+      note: "Setuju maupun tidak setuju dengan vonis sistem — dua-duanya bukti tuning. Awali insight dengan [PILOT].",
+    },
+    {
+      key: "triageReview", label: "Noor sudah menelusuri semua triase lead vs penilaiannya sendiri", target: 1, actual: 0,
+      met: false, manual: true,
+      note: "Hanya Noor yang bisa menilai ini — kerjakan di hari 14, tulis persentase setuju di learning [PILOT].",
+    },
+    {
+      key: "patterns", label: "Pola berulang dari data nyata (≥2 bukti internal per learning)", target: 2,
+      actual: i.repeatedRealPatterns, met: i.repeatedRealPatterns >= 2,
+      note: "Dihitung dari ledger bukti Fase A: learning nyata yang punya ≥2 bukti MENDUKUNG bersumber data internal.",
+    },
+    {
+      key: "noExample", label: "Data contoh dihapus (lead/post/kampanye)", target: 0,
+      actual: i.exampleRowsRemaining, met: i.exampleRowsRemaining === 0,
+      note: "Hitungan pilot memang sudah mengecualikan data contoh secara struktural, tapi gerbang Fase B menuntut layar bersih dari contoh.",
+    },
+  ];
+  const auto = conditions.filter((x) => !x.manual);
+  const autoMet = auto.filter((x) => x.met).length;
+  const daysDone = i.pilotDayNumber !== null && i.pilotDayNumber >= 14;
+  return {
+    conditions,
+    autoMet,
+    totalAuto: auto.length,
+    daysDone,
+    locked: !daysDone || autoMet < auto.length,
+    lockMessage: PHASE_B_LOCK_MESSAGE,
+  };
+}
+
 export interface PilotDayInfo {
   started: boolean;
   day: number | null; // 1..∞ (WIB, hari kalender)
