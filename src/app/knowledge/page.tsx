@@ -1,10 +1,18 @@
-import { deleteLearning, saveLearning, setLearningStrength } from "@/actions/knowledge";
+import { addEvidence, deleteLearning, saveLearning, setFalsifier, setLearningStrength } from "@/actions/knowledge";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getDashboardData } from "@/lib/dashboard";
 import { isLeadQualified, mapPostToInput } from "@/lib/data";
 import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
 import { compareByDimension } from "@/lib/engine/igDiagnosis";
+import {
+  buildProvenance,
+  CAPTURE_GAPS,
+  EVIDENCE_TYPE_LABEL,
+  falsifierTemplate,
+  MATURITY_LABEL,
+  type EvidenceType,
+} from "@/lib/engine/belief";
 import {
   LEARNING_SOURCE,
   SOURCE_LABEL,
@@ -18,7 +26,13 @@ export const dynamic = "force-dynamic";
 
 export default async function KnowledgePage() {
   const [learnings, posts, leads, d] = await Promise.all([
-    db.learning.findMany({ orderBy: { updatedAt: "desc" } }),
+    db.learning.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: {
+        evidence: { orderBy: { createdAt: "desc" } },
+        revisions: { orderBy: { createdAt: "desc" } },
+      },
+    }),
     db.igPost.findMany({ include: { leads: true } }),
     db.lead.findMany(),
     getDashboardData(),
@@ -60,6 +74,7 @@ export default async function KnowledgePage() {
       confidence: formData.get("confidence"),
       strength: formData.get("strength"),
       recommendedAction: formData.get("recommendedAction"),
+      falsifier: formData.get("falsifier"),
     });
   }
   async function saveManual(formData: FormData) {
@@ -72,7 +87,21 @@ export default async function KnowledgePage() {
       confidence: "RENDAH",
       strength: "LEMAH", // entri manual selalu mulai LEMAH — naik kelas lewat bukti
       recommendedAction: formData.get("recommendedAction"),
+      falsifier: formData.get("falsifier"),
     });
+  }
+  async function addEvidenceForm(formData: FormData) {
+    "use server";
+    await addEvidence({
+      learningId: formData.get("learningId"),
+      polarity: formData.get("polarity"),
+      sourceKind: formData.get("sourceKind"),
+      note: formData.get("note"),
+    });
+  }
+  async function setFalsifierForm(formData: FormData) {
+    "use server";
+    await setFalsifier(String(formData.get("learningId")), String(formData.get("falsifier")));
   }
 
   const input = "w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm";
@@ -86,7 +115,7 @@ export default async function KnowledgePage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title="Marketing Knowledge Engine"
-        subtitle="Learning yang bisa dipakai ulang — setiap insight wajib bawa data pendukung, sumber, dan tingkat kekuatan. Satu kejadian BUKAN kebenaran: saran otomatis maksimal 'Berkembang'; 'Terbukti' hanya lewat keputusan owner atas pola yang berulang, dan hanya untuk data internal."
+        subtitle="Learning yang bisa dipakai ulang — setiap insight wajib bawa data pendukung, sumber, tingkat kekuatan, dan FALSIFIER (syarat gugurnya sendiri). Satu kejadian BUKAN kebenaran: saran otomatis maksimal 'Berkembang'; 'Terbukti' hanya lewat keputusan owner atas pola yang berulang, dan hanya untuk data internal."
       />
 
       <Card title={`Saran dari data (${freshSuggestions.length})`} className="mb-6">
@@ -101,6 +130,7 @@ export default async function KnowledgePage() {
                   {s.supportingData} · kekuatan awal: <b>{STRENGTH_LABEL[s.strength]}</b>
                 </p>
                 <p className="mt-0.5 text-xs text-gray-600">→ {s.recommendedAction}</p>
+                <p className="mt-0.5 text-xs text-gray-500">Gugur jika: {s.falsifier}</p>
                 <form action={saveSuggestion} className="mt-2">
                   {Object.entries({
                     category: s.category,
@@ -110,6 +140,7 @@ export default async function KnowledgePage() {
                     confidence: s.confidence,
                     strength: s.strength,
                     recommendedAction: s.recommendedAction,
+                    falsifier: s.falsifier,
                   }).map(([k, v]) => (
                     <input key={k} type="hidden" name={k} value={v} />
                   ))}
@@ -129,38 +160,178 @@ export default async function KnowledgePage() {
             <p className="text-sm text-gray-400">—</p>
           ) : (
             <ul className="space-y-2">
-              {grouped[strength].map((l) => (
-                <li key={l.id} className="rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold">{l.insight}</div>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        Data: {l.supportingData} · Sumber: {SOURCE_LABEL[l.sourceType as LearningSource]} ·
-                        keyakinan {l.confidence.toLowerCase()} · diperbarui {formatTanggal(l.updatedAt)}
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-600">→ {l.recommendedAction}</p>
+              {grouped[strength].map((l) => {
+                const prov = buildProvenance({
+                  strength: l.strength,
+                  derivedFromPublic: l.derivedFromPublic,
+                  falsifier: l.falsifier,
+                  evidence: l.evidence,
+                  revisions: l.revisions,
+                });
+                return (
+                  <li key={l.id} className="rounded-lg border border-gray-100 bg-white p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold">
+                          {l.insight}
+                          {prov.projection.openContradiction && (
+                            <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                              ⚠ kontradiksi terbuka
+                            </span>
+                          )}
+                          {l.derivedFromPublic && (
+                            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              akar publik
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          Data: {l.supportingData} · Sumber: {SOURCE_LABEL[l.sourceType as LearningSource]} ·
+                          keyakinan {l.confidence.toLowerCase()} · diperbarui {formatTanggal(l.updatedAt)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-600">→ {l.recommendedAction}</p>
+                      </div>
+                      <form action={deleteLearning.bind(null, l.id)}>
+                        <button className="text-xs text-gray-300 hover:text-red-500">✕</button>
+                      </form>
                     </div>
-                    <form action={deleteLearning.bind(null, l.id)}>
-                      <button className="text-xs text-gray-300 hover:text-red-500">✕</button>
-                    </form>
-                  </div>
-                  <div className="mt-2 flex gap-1.5">
-                    {(["TERBUKTI", "BERKEMBANG", "LEMAH"] as const)
-                      .filter((s) => s !== l.strength && !(s === "TERBUKTI" && l.sourceType !== "DATA_INTERNAL"))
-                      .map((s) => (
-                        <form key={s} action={setLearningStrength.bind(null, l.id, s)}>
-                          <button className="rounded border border-gray-300 px-2 py-0.5 text-[10px] font-semibold text-gray-500 hover:bg-gray-100">
-                            → {s.toLowerCase()}
+
+                    <details className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-gray-600">
+                        Kenapa percaya ini? — {MATURITY_LABEL[prov.projection.maturity]} ·{" "}
+                        {prov.projection.supportingCount} bukti mendukung · {prov.projection.opposingCount} menentang
+                      </summary>
+                      <div className="mt-2 space-y-2 text-xs">
+                        {l.falsifier ? (
+                          <p className="text-gray-700">
+                            <b>Gugur jika:</b> {l.falsifier}
+                          </p>
+                        ) : (
+                          <form action={setFalsifierForm} className="space-y-1">
+                            <input type="hidden" name="learningId" value={l.id} />
+                            <textarea
+                              name="falsifier" required rows={2}
+                              placeholder={falsifierTemplate(l.category)}
+                              className={input}
+                            />
+                            <button className="rounded border border-gray-400 px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-100">
+                              Simpan falsifier (learning lama belum punya)
+                            </button>
+                          </form>
+                        )}
+
+                        {prov.honestyNotes.length > 0 && (
+                          <ul className="space-y-0.5 text-amber-700">
+                            {prov.honestyNotes.map((n) => (
+                              <li key={n}>⚠ {n}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {l.evidence.length > 0 && (
+                          <div>
+                            <div className="font-semibold text-gray-600">Ledger bukti ({l.evidence.length})</div>
+                            <ul className="mt-1 space-y-1">
+                              {l.evidence.map((e) => (
+                                <li key={e.id} className="rounded border border-gray-200 bg-white p-1.5">
+                                  <span
+                                    className={`mr-1.5 rounded px-1 py-0.5 text-[10px] font-bold ${
+                                      e.polarity === "MENDUKUNG"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}
+                                  >
+                                    {e.polarity === "MENDUKUNG" ? "+ mendukung" : "− menentang"}
+                                  </span>
+                                  {e.note}
+                                  <span className="block text-[10px] text-gray-400">
+                                    {EVIDENCE_TYPE_LABEL[e.evidenceType as EvidenceType]} · sumber{" "}
+                                    {SOURCE_LABEL[e.sourceKind as LearningSource]} · andal ~{e.reliabilityPct}% ·{" "}
+                                    {formatTanggal(e.createdAt)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {l.revisions.length > 0 && (
+                          <div>
+                            <div className="font-semibold text-gray-600">Riwayat revisi ({l.revisions.length})</div>
+                            <ul className="mt-1 space-y-0.5 text-gray-500">
+                              {l.revisions.map((r) => (
+                                <li key={r.id}>
+                                  {formatTanggal(r.createdAt)}: {r.fromState ? `${r.fromState} → ` : "lahir sebagai "}
+                                  <b>{r.toState}</b> · {r.trigger} ({r.actor === "OWNER" ? "owner" : "sistem"})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <form action={addEvidenceForm} className="space-y-1 rounded border border-gray-200 bg-white p-2">
+                          <div className="font-semibold text-gray-600">+ Catat bukti baru (tidak mengubah status otomatis)</div>
+                          <input type="hidden" name="learningId" value={l.id} />
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <select name="polarity" className={input}>
+                              <option value="MENDUKUNG">Mendukung</option>
+                              <option value="MENENTANG">Menentang</option>
+                            </select>
+                            <select name="sourceKind" defaultValue={l.sourceType} className={input}>
+                              {LEARNING_SOURCE.map((s) => (
+                                <option key={s} value={s}>{SOURCE_LABEL[s]}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <textarea
+                            name="note" required rows={2}
+                            placeholder="Bukti spesifik — angka/kejadian, bukan opini. Contoh: 'Post carousel BEFORE_AFTER 12 Jul: 2 lead berkualitas.'"
+                            className={input}
+                          />
+                          <button className="rounded bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-gray-700">
+                            Catat bukti
                           </button>
                         </form>
-                      ))}
-                  </div>
-                </li>
-              ))}
+                      </div>
+                    </details>
+
+                    <div className="mt-2 flex gap-1.5">
+                      {(["TERBUKTI", "BERKEMBANG", "LEMAH"] as const)
+                        .filter(
+                          (s) =>
+                            s !== l.strength &&
+                            !(s === "TERBUKTI" && (l.sourceType !== "DATA_INTERNAL" || l.derivedFromPublic)),
+                        )
+                        .map((s) => (
+                          <form key={s} action={setLearningStrength.bind(null, l.id, s)}>
+                            <button className="rounded border border-gray-300 px-2 py-0.5 text-[10px] font-semibold text-gray-500 hover:bg-gray-100">
+                              → {s.toLowerCase()}
+                            </button>
+                          </form>
+                        ))}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
       ))}
+
+      <Card title="Titik Buta (Capture-Gap Register)" className="mb-6">
+        <p className="mb-2 text-xs text-gray-500">
+          Sumber yang sistem TAHU penting tapi BELUM ditangkap. Selama kosong, kesimpulan apa pun yang
+          bergantung padanya jujurnya asumsi — daftar ini ada supaya titik buta terlihat, bukan disembunyikan.
+        </p>
+        <ul className="space-y-1.5 text-sm">
+          {CAPTURE_GAPS.map((g) => (
+            <li key={g.key} className="rounded-lg border border-gray-100 bg-gray-50 p-2">
+              <b>{g.label}</b>
+              <span className="block text-xs text-gray-500">{g.why}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <Card title="Tambah learning manual">
         <form action={saveManual} className="space-y-2">
@@ -179,6 +350,7 @@ export default async function KnowledgePage() {
           <textarea name="insight" required rows={2} placeholder="Insight — contoh: 'Area Citraland lebih responsif ke penawaran full-house daripada per-ruangan'" className={input} />
           <textarea name="supportingData" required rows={2} placeholder="Data pendukung — WAJIB. Tanpa data, ini opini, dan akan tersimpan sebagai LEMAH." className={input} />
           <textarea name="recommendedAction" required rows={2} placeholder="Aksi yang disarankan" className={input} />
+          <textarea name="falsifier" required rows={2} placeholder="Falsifier — WAJIB. Bukti apa yang akan memaksa learning ini dibuang? Contoh: 'Jika 5 lead Citraland berikutnya minta per-ruangan, buang.'" className={input} />
           <button className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700">
             Simpan (mulai sebagai LEMAH)
           </button>

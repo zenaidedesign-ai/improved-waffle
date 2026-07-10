@@ -385,6 +385,7 @@ Entities and relations only — no fields typed for SQL, no indices, no Prisma. 
 Honesty = minimum real data. Each phase names the volume gate below which everything holds at hypothesis/`TAHAN`.
 
 **Phase A — Ledger + projection (no new claims).** Build EvidenceItem/BeliefRevision, wrap current Learnings as Beliefs, expose provenance and the Capture-Gap Register. **Honest at any volume** — it only records what exists. Ship inside Pilot mode.
+> **Status: TERPASANG (Juli 2026).** `src/lib/engine/belief.ts` + ledger di `prisma/schema.prisma` (EvidenceItem, BeliefRevision, Learning.falsifier/derivedFromPublic) + provenance & Titik Buta di `/knowledge`. Falsifier wajib untuk learning baru; bukti MENENTANG hanya MENANDAI kontradiksi (tidak mengubah status — itu Fase B).
 
 **Phase B — Shared scoring + lifecycle.** Replace per-rule confidence with `scoreBelief` (multiplicative gates + caps); enable hypothesis↔pattern↔emerging↔strong + outdated decay. **Honest at ≥2 repetitions per pattern and ≥5 leads/campaign rows** (`MIN_DENOM`/`strengthCap`); below that, everything holds at hypothesis/`TAHAN`. **Phase B steady-state is explicitly acceptable** (Completeness 4.3 fix): a boutique with n=3 clusters may live here for a long time with *zero* proven beliefs, and that is **honesty, not failure** — the value-delta report reads *"belum ada belief yang terbukti bulan ini"* plainly rather than manufacturing progress.
 

@@ -366,9 +366,15 @@ model Learning {
   confidence     String // "RENDAH" | "SEDANG" | "TINGGI"
   strength       String // "TERBUKTI" | "BERKEMBANG" | "LEMAH" — TERBUKTI hanya boleh dari DATA_INTERNAL
   recommendedAction String
+  // Fase A Intelligence Layer: falsifier WAJIB untuk learning BARU
+  // (kolom opsional demi baris lama; dipaksa zod di jalur create).
+  falsifier         String?
+  derivedFromPublic Boolean  @default(false) // Cap C transitif
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   isExample      Boolean  @default(false)
+  evidence       EvidenceItem[]
+  revisions      BeliefRevision[]
 }
 
 // ── Impor CSV aman (Phase 12) — setiap impor tercatat & bisa dibatalkan ──
@@ -379,4 +385,38 @@ model ImportBatch {
   fileName  String?
   rowCount  Int
   createdAt DateTime @default(now())
+}
+
+// ── Intelligence Layer — Fase A: Ledger Bukti & Riwayat Keyakinan ──
+// Append-only: koreksi = baris baru, tidak pernah edit/hapus baris lama.
+// Learning = penyimpanan Belief (proyeksi); dua tabel ini anaknya.
+model EvidenceItem {
+  id                 String   @id @default(cuid())
+  learningId         String
+  learning           Learning @relation(fields: [learningId], references: [id], onDelete: Cascade)
+  evidenceType       String // "FAKTA" | "OBSERVASI" | "ASUMSI_OWNER" (Sumbu A)
+  polarity           String // "MENDUKUNG" | "MENENTANG"
+  evidenceRole       String   @default("OUTCOME") // "OUTCOME" | "DIAGNOSTIK" (vanity = DIAGNOSTIK)
+  contributesToScore Boolean  @default(true) // vanity/belum-verifikasi = false
+  derivedFromPublic  Boolean  @default(false) // Cap C: menular transitif
+  sourceKind         String // LEARNING_SOURCE: DATA_INTERNAL | PENGETAHUAN_OWNER | OBSERVASI_KOMPETITOR | TREN_PUBLIK | HIPOTESIS
+  reliabilityPct     Int
+  payloadType        String? // "LEAD" | "IG_POST" | "CAMPAIGN" | "KOMPETITOR" | "CATATAN"
+  payloadId          String?
+  note               String // bukti tanpa catatan = bukan bukti
+  createdAt          DateTime @default(now())
+  isExample          Boolean  @default(false)
+}
+
+model BeliefRevision {
+  id         String   @id @default(cuid())
+  learningId String
+  learning   Learning @relation(fields: [learningId], references: [id], onDelete: Cascade)
+  fromState  String? // null = kelahiran belief
+  toState    String // LEARNING_STRENGTH
+  trigger    String // apa yang memicu transisi
+  actor      String // "SYSTEM" | "OWNER" — promosi selalu OWNER
+  note       String?
+  createdAt  DateTime @default(now())
+  isExample  Boolean  @default(false)
 }

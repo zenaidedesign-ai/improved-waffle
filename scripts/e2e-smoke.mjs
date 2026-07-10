@@ -194,12 +194,35 @@ await check("knowledge: saran dari data + simpan learning", async () => {
   if (!body.includes("Saran dari data")) throw new Error("blok saran hilang");
   if (!body.includes("BEFORE_AFTER")) throw new Error("saran pilar (n≥2) tidak muncul dari data contoh");
   if (!body.includes("layak diulang")) throw new Error("saran pola kampanye scale tidak muncul");
+  if (!body.includes("Gugur jika:")) throw new Error("saran tidak membawa falsifier (Fase A)");
   await page.click('button:has-text("Simpan sebagai learning")');
   await page.waitForTimeout(2500);
   await page.goto(BASE + "/knowledge");
   const body2 = await page.textContent("body");
   if (!body2.includes("Lemah (kejadian tunggal / sampel kecil) (1)") && !body2.includes("sampel kecil) (1)"))
     throw new Error("learning tidak tersimpan sebagai LEMAH");
+});
+
+await check("knowledge fase A: provenance, ledger bukti, kontradiksi, titik buta", async () => {
+  const body = await page.textContent("body");
+  if (!body.includes("Titik Buta (Capture-Gap Register)")) throw new Error("register titik buta hilang");
+  if (!body.includes("Hasil proyek terkirim")) throw new Error("gap hasil proyek (penghalang FAKTA) hilang");
+  if (!body.includes("Kenapa percaya ini?")) throw new Error("expander provenance hilang");
+  // Buka provenance learning yang baru disimpan — harus ada revisi kelahiran + bukti awal.
+  await page.click('summary:has-text("Kenapa percaya ini?")');
+  const det = await page.textContent("body");
+  if (!det.includes("lahir sebagai")) throw new Error("revisi kelahiran tidak tercatat");
+  if (!det.includes("Ledger bukti (1)")) throw new Error("bukti awal (data pendukung) tidak masuk ledger");
+  if (!det.includes("Gugur jika:")) throw new Error("falsifier learning tersimpan tidak tampil");
+  // Catat bukti MENENTANG → kontradiksi terbuka HARUS terlihat; status TIDAK boleh turun otomatis.
+  await page.selectOption('select[name="polarity"]', "MENENTANG");
+  await page.fill('textarea[name="note"]', "Post BEFORE_AFTER minggu ini: 0 lead berkualitas dari 3 post.");
+  await page.click('button:has-text("Catat bukti")');
+  await page.waitForTimeout(2500);
+  await page.goto(BASE + "/knowledge");
+  const body3 = await page.textContent("body");
+  if (!body3.includes("kontradiksi terbuka")) throw new Error("bukti menentang tidak memunculkan kontradiksi terbuka");
+  if (!body3.includes("sampel kecil) (1)")) throw new Error("status berubah otomatis — Fase A dilarang mengubah status");
 });
 
 await check("impor: template unduh + ekspor CSV jalan", async () => {

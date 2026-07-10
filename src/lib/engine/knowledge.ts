@@ -1,3 +1,5 @@
+import { falsifierTemplate } from "./belief";
+
 // Marketing Knowledge Engine (Phase 11) — saran learning DITURUNKAN dari data,
 // owner yang memutuskan menyimpan. Satu kejadian BUKAN kebenaran:
 // auto-saran maksimal berkekuatan BERKEMBANG; TERBUKTI harus diputuskan owner
@@ -37,6 +39,7 @@ export interface LearningSuggestion {
   strength: LearningStrength; // dibatasi otomatis berdasar ukuran sampel
   confidence: "RENDAH" | "SEDANG" | "TINGGI";
   recommendedAction: string;
+  falsifier: string; // Fase A: setiap saran lahir dengan syarat gugurnya sendiri
 }
 
 /** Kekuatan maksimal berdasar ukuran sampel — anti "satu kejadian jadi kebenaran". */
@@ -64,6 +67,7 @@ export function suggestLearnings(i: SuggestInput): LearningSuggestion[] {
       strength: strengthCap(p.n),
       confidence: p.n >= 8 ? "SEDANG" : "RENDAH",
       recommendedAction: `Pertahankan ritme pilar ${p.pillar}; uji variasi hook lewat kartu eksperimen.`,
+      falsifier: falsifierTemplate("KONTEN"),
     });
   }
 
@@ -79,6 +83,7 @@ export function suggestLearnings(i: SuggestInput): LearningSuggestion[] {
         strength: strengthCap(c.leads),
         confidence: c.leads >= 10 ? "SEDANG" : "RENDAH",
         recommendedAction: "Perketat penawaran/penyaringan di kanal ini, atau geser budget ke kanal dengan rasio kualifikasi lebih baik.",
+        falsifier: falsifierTemplate("KANAL"),
       });
     }
   }
@@ -93,6 +98,7 @@ export function suggestLearnings(i: SuggestInput): LearningSuggestion[] {
       strength: "LEMAH",
       confidence: "SEDANG",
       recommendedAction: "Jangan ulangi penawaran/audiens serupa tanpa perubahan; catat pola ini saat merancang kampanye baru.",
+      falsifier: falsifierTemplate("KAMPANYE"),
     });
   }
 
@@ -106,6 +112,7 @@ export function suggestLearnings(i: SuggestInput): LearningSuggestion[] {
       strength: "LEMAH", // satu kampanye = satu kejadian
       confidence: "SEDANG",
       recommendedAction: "Ulangi struktur penawaran+audiens ini di kampanye berikutnya; naikkan ke BERKEMBANG setelah pola terjadi ≥ 2 kali.",
+      falsifier: falsifierTemplate("KAMPANYE"),
     });
   }
 
