@@ -2,20 +2,12 @@
 // dari data nyata. Semua logika keputusan ada di engine; file ini hanya
 // mengambil, memetakan, dan merakit.
 
-import { buildCampaignFunnel, getGateStatus, isLeadQualified, mapPostToInput } from "./data";
+import { assessCampaigns, getGateStatus, isLeadQualified, mapPostToInput } from "./data";
 import { db } from "./db";
 import { CONFIG } from "./domain/config";
 import type { StatusLampu } from "./domain/enums";
-import {
-  campaignHealth,
-  compareCampaigns,
-  computeCostChain,
-  decideCampaign,
-  type CampaignChainSummary,
-  type KesehatanKampanye,
-} from "./engine/adsRescue";
+import { compareCampaigns, type CampaignRow } from "./engine/adsRescue";
 import { gateLock, type AuditAging, type GateLockResult } from "./engine/gates";
-import { assessDataQuality } from "./engine/adsRescue";
 import { backupDue } from "./engine/dataTruth";
 import { rankAdCandidates } from "./engine/verdicts";
 import {
@@ -30,19 +22,10 @@ import { followUpQueue, type FollowUpItem } from "./engine/leadTriage";
 import { buildTop5, type PriorityItem } from "./engine/priorities";
 import type { VerdictProposal } from "./engine/types";
 import { decideContentMix, decideIgWinner } from "./engine/verdicts";
-import { weekStartOf } from "./engine/warRoom";
+import { DAY_MS, weekStartOf } from "./time";
 
-export interface CampaignRow {
-  id: string;
-  name: string;
-  channel: string;
-  status: string;
-  spendRibu: number;
-  cpqlRibu: number | null;
-  qualifiedLeads: number;
-  health: KesehatanKampanye;
-  verdict: VerdictProposal;
-}
+// CampaignRow kini tinggal di engine/adsRescue — re-export demi kompatibilitas impor lama.
+export type { CampaignRow } from "./engine/adsRescue";
 
 export interface DashboardData {
   // Metrik utama (bulan berjalan)
@@ -100,7 +83,7 @@ const ACTIVE_STATUSES = [
 
 export async function getDashboardData(now = new Date()): Promise<DashboardData> {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const d30 = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+  const d30 = new Date(now.getTime() - 30 * DAY_MS);
 
   const [gates, leadsMonth, allLeads, posts, snapshots, campaigns, openDecisions, postCount, lastBackup] =
     await Promise.all([
@@ -123,7 +106,7 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
     .flatMap((c) => c.metrics)
     .filter((m) => m.date >= monthStart)
     .reduce((s, m) => s + m.spendRibu, 0);
-  const adsQualifiedMonth = leadsMonth.filter((l) => l.sourceType === "ADS" && isLeadQualified(l)).length;
+  const adsQualifiedMonth = leadsMonth.filter((l) => l.leadSource === "ADS" && isLeadQualified(l)).length;
 
   const primary = {
     qualifiedLeads: leadsMonth.filter(isLeadQualified).length,
@@ -144,12 +127,12 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
         ? Math.round(monthSpendRibu / adsQualifiedMonth)
         : null,
     costPerSurveyRibu: (() => {
-      const n = leadsMonth.filter((l) => l.sourceType === "ADS" &&
+      const n = leadsMonth.filter((l) => l.leadSource === "ADS" &&
         ["SURVEI_TERJADWAL", "SURVEI_SELESAI", "PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status)).length;
       return monthSpendRibu > 0 && n > 0 ? Math.round(monthSpendRibu / n) : null;
     })(),
     costPerProposalRibu: (() => {
-      const n = leadsMonth.filter((l) => l.sourceType === "ADS" &&
+      const n = leadsMonth.filter((l) => l.leadSource === "ADS" &&
         ["PROPOSAL_TERKIRIM", "NEGOSIASI", "CLOSING_MENANG"].includes(l.status)).length;
       return monthSpendRibu > 0 && n > 0 ? Math.round(monthSpendRibu / n) : null;
     })(),
@@ -181,31 +164,8 @@ export async function getDashboardData(now = new Date()): Promise<DashboardData>
             ? "Akun lolos audit; tren distribusi belum bisa dinilai (snapshot < 3 minggu)."
             : `Akun lolos audit; reach non-follower ${trend.direction === "NAIK" ? "naik" : "stabil"}.`;
 
-  // ── Kampanye (Q2 & Q4) ──
-  const campaignRows: CampaignRow[] = campaigns.map((c) => {
-    const chain = computeCostChain(buildCampaignFunnel(c));
-    const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
-    const dq = assessDataQuality(c.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), now);
-    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target, dq);
-    return {
-      id: c.id,
-      name: c.name,
-      channel: c.channel,
-      status: c.status,
-      spendRibu: chain.spendRibu,
-      cpqlRibu: chain.cpqlRibu,
-      qualifiedLeads: chain.qualifiedLeads,
-      health: campaignHealth(verdict),
-      verdict,
-    };
-  });
-  const summaries: CampaignChainSummary[] = campaigns.map((c) => ({
-    id: c.id,
-    name: c.name,
-    status: c.status,
-    targetCpqlRibu: c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
-    chain: computeCostChain(buildCampaignFunnel(c)),
-  }));
+  // ── Kampanye (Q2 & Q4) — penilaian BERSAMA dengan halaman kampanye ──
+  const { rows: campaignRows, summaries } = assessCampaigns(campaigns, gates.gate0, gates.gate1, now);
   const moveBudget = lock.locked ? null : compareCampaigns(summaries);
   const wastingCampaigns = campaignRows.filter(
     (r) =>

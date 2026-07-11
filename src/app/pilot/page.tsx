@@ -4,50 +4,22 @@
 import Link from "next/link";
 import { startPilot } from "@/actions/pilot";
 import { Card, PageHeader, SensitiveDataNotice } from "@/components/ui";
-import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
-import { computePilotProgress, pilotDay } from "@/lib/engine/pilot";
 import { getPhaseBGate } from "@/lib/pilotGate";
 
 export const dynamic = "force-dynamic";
 
-const REAL = { isExample: false } as const;
-
 export default async function PilotPage() {
-  const now = new Date();
-  const [
-    realLeads, realPosts, adsCsvBatches, warRoomSessions, auditTypes, realSnapshots,
-    pilotLearnings, startedSetting, exampleLeads,
-  ] = await Promise.all([
-    db.lead.count({ where: REAL }),
-    db.igPost.count({ where: REAL }),
-    db.importBatch.count({ where: { type: "ADS_METRIC" } }),
-    db.warRoomSession.count({ where: REAL }),
-    db.auditRun.findMany({ where: REAL, select: { type: true }, distinct: ["type"] }),
-    db.igAccountSnapshot.count({ where: REAL }),
-    db.learning.count({ where: { insight: { startsWith: "[PILOT]" } } }),
-    db.setting.findUnique({ where: { key: "pilot.startedAt" } }),
-    db.lead.count({ where: { isExample: true } }),
-  ]);
-
-  const progress = computePilotProgress({
-    realLeads,
-    realPosts,
-    realAdsCsvImports: adsCsvBatches,
-    warRoomSessions,
-    auditTypesRun: auditTypes.length,
-    realSnapshots,
-    pilotLearnings,
-  });
-  const day = pilotDay(startedSetting ? new Date(startedSetting.value) : null, now);
-  const { gate } = await getPhaseBGate(now);
+  // SATU sumber hitungan: getPhaseBGate. Halaman ini hanya menampilkan.
+  const { gate, day, progress, counts, startedAt } = await getPhaseBGate(new Date());
+  const { exampleLeads } = counts;
 
   const day1Items: Array<{ label: string; done: boolean; href: string }> = [
-    { label: "Jalankan ketiga audit (Akun Meta, Rekomendasi, Tracking) dengan jawaban NYATA", done: auditTypes.length >= 3, href: "/audit/meta-account" },
-    { label: "Input lead 7 hari terakhir dari WhatsApp (semua chat masuk = satu baris)", done: realLeads >= 1, href: "/leads/baru" },
-    { label: "Impor satu CSV Ads Manager nyata (kalau iklan berjalan)", done: adsCsvBatches >= 1, href: "/impor" },
-    { label: "Input 5 post Instagram terakhir + angka dari IG Insights", done: realPosts >= 5, href: "/instagram/post/baru" },
-    { label: "Buka Laporan Revenue pertama (War Room) & baca vonisnya", done: warRoomSessions >= 1, href: "/laporan" },
+    { label: "Jalankan ketiga audit (Akun Meta, Rekomendasi, Tracking) dengan jawaban NYATA", done: counts.auditTypesRun >= 3, href: "/audit/meta-account" },
+    { label: "Input lead 7 hari terakhir dari WhatsApp (semua chat masuk = satu baris)", done: counts.realLeads >= 1, href: "/leads/baru" },
+    { label: "Impor satu CSV Ads Manager nyata (kalau iklan berjalan)", done: counts.adsCsvBatches >= 1, href: "/impor" },
+    { label: "Input 5 post Instagram terakhir + angka dari IG Insights", done: counts.realPosts >= 5, href: "/instagram/post/baru" },
+    { label: "Buka Laporan Revenue pertama (War Room) & baca vonisnya", done: counts.realWarRooms >= 1, href: "/laporan" },
   ];
 
   return (
@@ -95,7 +67,7 @@ export default async function PilotPage() {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <span className="text-3xl font-black">Hari ke-{day.day}</span>
-              <span className="text-sm text-gray-500"> / 14 · mulai {formatTanggal(new Date(startedSetting!.value))}</span>
+              <span className="text-sm text-gray-500"> / 14 · mulai {formatTanggal(startedAt!)}</span>
             </div>
             <span className="text-sm font-semibold text-gray-600">
               {day.phase === "HARI_1" && "Fokus hari ini: checklist Hari 1 di bawah."}
@@ -185,9 +157,9 @@ export default async function PilotPage() {
             <li><Link className="underline" href="/kompetitor">Perbarui 1 battle card kompetitor</Link> dari pengamatan publik.</li>
             <li><Link className="underline" href="/laporan">Baca Revenue War Room</Link>, lalu <Link className="underline" href="/war-room">komit ≤ 5 keputusan</Link>.</li>
             <li>
-              Catat ketidaksetujuan sebagai learning <code>[PILOT]</code> di{" "}
-              <Link className="underline" href="/knowledge">Knowledge</Link> — contoh insight:
-              “[PILOT] Lead X dilabel Abaikan, padahal serius — sinyal budget terlalu ketat.”
+              Catat ketidaksetujuan/konfirmasi di{" "}
+              <Link className="underline" href="/knowledge">Pustaka Pelajaran</Link> — centang
+              <b> “Catatan pilot”</b> di form (prefix <code>[PILOT]</code> terpasang otomatis).
             </li>
             <li><Link className="underline" href="/impor">Ekspor CSV cadangan</Link>.</li>
           </ol>

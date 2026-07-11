@@ -54,7 +54,7 @@ export default async function LeadsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Lead Intelligence"
+        title="Pusat Lead"
         subtitle="Triase deterministik — sistem menjelaskan KENAPA setiap lead diberi label. 👑 = wajib ditangani Noor sendiri (nilai besar / negosiasi / prob. closing tinggi). Probabilitas closing = estimasi kasar, bukan ramalan."
         action={
           <Link href="/leads/baru" className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700">

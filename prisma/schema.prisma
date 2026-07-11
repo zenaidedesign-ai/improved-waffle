@@ -213,7 +213,7 @@ model CampaignMetricDaily {
 model Lead {
   id                 String      @id @default(cuid())
   name               String
-  sourceType         String // "ADS" | "IG_ORGANIK" | "REFERRAL" | "LAINNYA"
+  leadSource         String // "ADS" | "IG_ORGANIK" | "REFERRAL" | "LAINNYA" — sumber LEAD; sumber DATA ada di sourceDataType
   campaignId         String?
   campaign           Campaign?   @relation(fields: [campaignId], references: [id])
   sourceCampaignName String?

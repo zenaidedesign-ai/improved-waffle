@@ -5,6 +5,7 @@ import {
   triageLead,
   type LeadTriageInput,
 } from "../../src/lib/engine/leadTriage";
+import { computeQualityScore, isQualified } from "../../src/lib/engine/leadTriage";
 
 const NOW = new Date("2026-07-05T10:00:00Z");
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 24 * 3600 * 1000);
@@ -118,5 +119,19 @@ describe("followUpQueue", () => {
       NOW,
     );
     expect(q.map((x) => x.name)).toEqual(["besar-urgent", "kecil-urgent", "followup"]);
+  });
+});
+
+describe("computeQualityScore & isQualified — satu sumber kebenaran skor lead", () => {
+  const signals = { signalBudget: 18, signalProjectType: 16, signalLocation: 20, signalUrgency: 14, signalSeriousness: 16 };
+  it("skor = jumlah 5 sinyal — dipakai form, aksi, seed, dan impor CSV", () => {
+    expect(computeQualityScore(signals)).toBe(84);
+    expect(computeQualityScore({ signalBudget: 0, signalProjectType: 0, signalLocation: 0, signalUrgency: 0, signalSeriousness: 0 })).toBe(0);
+  });
+  it("berkualitas = skor ≥ 60 DAN jawaban ≥ 3; salah satu kurang ⇒ tidak", () => {
+    expect(isQualified(60, 3)).toBe(true);
+    expect(isQualified(59, 3)).toBe(false);
+    expect(isQualified(60, 2)).toBe(false);
+    expect(isQualified(84, 5)).toBe(true);
   });
 });

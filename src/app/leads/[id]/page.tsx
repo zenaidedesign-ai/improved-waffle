@@ -36,7 +36,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const initial: LeadFormInitial = {
     id: lead.id,
     name: lead.name,
-    sourceType: lead.sourceType as LeadSource,
+    leadSource: lead.leadSource as LeadSource,
     status: lead.status as LeadStatus,
     signalBudget: lead.signalBudget,
     signalProjectType: lead.signalProjectType,

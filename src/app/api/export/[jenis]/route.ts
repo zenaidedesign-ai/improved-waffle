@@ -14,7 +14,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jenis: string 
   if (jenis === "lead") {
     const rows = await db.lead.findMany({ orderBy: { createdAt: "desc" } });
     csv = toCsv(CSV_DEF.LEAD.headers, rows.map((l) => [
-      l.name, l.sourceType, l.status, l.signalBudget, l.signalProjectType, l.signalLocation,
+      l.name, l.leadSource, l.status, l.signalBudget, l.signalProjectType, l.signalLocation,
       l.signalUrgency, l.signalSeriousness, l.qualAnswersCount, l.estimatedValueJuta, iso(l.createdAt),
     ]));
   } else if (jenis === "ig-post") {

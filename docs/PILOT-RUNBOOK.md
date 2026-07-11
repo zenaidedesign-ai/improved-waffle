@@ -57,8 +57,9 @@ Selama 14 hari pilot, sistem DIKUNCI dari pembangunan lanjutan:
 2. Impor CSV Ads Manager minggu lalu (atau input manual).
 3. Perbarui 1 battle card kompetitor dari pengamatan publik.
 4. Baca Revenue War Room → komit maksimal 5 keputusan di War Room Mingguan.
-5. Catat ketidaksetujuan/konfirmasi minggu itu sebagai learning `[PILOT]` di Knowledge —
-   lengkap dengan falsifier ("bukti apa yang membatalkan catatan ini?").
+5. Catat ketidaksetujuan/konfirmasi minggu itu di Pustaka Pelajaran — centang **"Catatan
+   pilot"** di form (prefix `[PILOT]` terpasang otomatis, tidak perlu diketik), lengkap
+   dengan falsifier ("bukti apa yang membatalkan catatan ini?").
 6. **Ledger bukti:** untuk learning yang sudah ada, catat bukti minggu ini di expander
    "Kenapa percaya ini?" — mendukung ATAU menentang, dua-duanya dicatat. Learning dengan
    ≥ 2 bukti internal mendukung = "pola berulang" yang dihitung Gerbang Fase B.

@@ -3,6 +3,7 @@
 // BUKAN dari angka "hasil" Ads Manager (resultsPlatform hanya pembanding).
 
 import { CONFIG } from "../domain/config";
+import { ageDays } from "./time";
 import type { LapisanMasalah, StatusLampu } from "../domain/enums";
 import { FRESHNESS_DAYS, RELIABILITY, type DataSource } from "./dataTruth";
 import { gateLock } from "./gates";
@@ -114,6 +115,19 @@ export const KESEHATAN_LABEL: Record<KesehatanKampanye, string> = {
   RUSAK: "Rusak",
   BELUM_CUKUP_DATA: "Belum cukup data",
 };
+
+/** Baris kampanye ternilai — bentuk bersama untuk dashboard, halaman kampanye, dan laporan mingguan. */
+export interface CampaignRow {
+  id: string;
+  name: string;
+  channel: string;
+  status: string;
+  spendRibu: number;
+  cpqlRibu: number | null;
+  qualifiedLeads: number;
+  health: KesehatanKampanye;
+  verdict: VerdictProposal;
+}
 
 /** Peta vonis → status kesehatan. Deterministik, bukan penilaian terpisah. */
 export function campaignHealth(verdict: VerdictProposal): KesehatanKampanye {
@@ -227,12 +241,12 @@ export function assessDataQuality(
     return { ageDays: null, stale: true, worstSource: null, verifyBeforeBudget: false, manualOnly: false };
   }
   const newest = metrics.reduce((a, b) => (a.date > b.date ? a : b)).date;
-  const ageDays = Math.floor((now.getTime() - newest.getTime()) / (24 * 3600 * 1000));
+  const dataAgeDays = ageDays(newest, now);
   const sources = metrics.map((m) => m.sourceType as DataSource);
   const worstSource = [...sources].sort((a, b) => SOURCE_RANK.indexOf(a) - SOURCE_RANK.indexOf(b))[0] ?? null;
   return {
-    ageDays,
-    stale: ageDays > FRESHNESS_DAYS.ADS,
+    ageDays: dataAgeDays,
+    stale: dataAgeDays > FRESHNESS_DAYS.ADS,
     worstSource,
     verifyBeforeBudget: sources.some((s) => RELIABILITY[s]?.verifyBeforeBudget),
     manualOnly: sources.length > 0 && sources.every((s) => s === "MANUAL"),

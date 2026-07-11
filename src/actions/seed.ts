@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { buildSeed } from "@/lib/domain/seedData";
 import { computeGateVerdict } from "@/lib/engine/gates";
+import { computeQualityScore } from "@/lib/engine/leadTriage";
 import { computeSignalScore } from "@/lib/engine/igDiagnosis";
 import { mapPostToInput } from "@/lib/data";
 import type { AuditAnswerInput } from "@/lib/engine/types";
@@ -70,8 +71,7 @@ export async function loadExampleData(): Promise<void> {
   }
 
   for (const l of seed.leads) {
-    const qualityScore =
-      l.signalBudget + l.signalProjectType + l.signalLocation + l.signalUrgency + l.signalSeriousness;
+    const qualityScore = computeQualityScore(l);
     await db.lead.create({ data: { ...l, qualityScore, isExample: true } });
   }
 
@@ -82,6 +82,41 @@ export async function loadExampleData(): Promise<void> {
   for (const pp of seed.painPoints) await db.painPoint.create({ data: { ...pp, isExample: true } });
   for (const ob of seed.objections) await db.objection.create({ data: { ...ob, isExample: true } });
   for (const ex of seed.experiments) await db.experiment.create({ data: { ...ex, isExample: true } });
+
+  // Satu learning contoh LENGKAP dengan ledger-nya — memperlihatkan falsifier,
+  // bukti, dan riwayat revisi bekerja; ikut terhapus oleh "Hapus data contoh".
+  await db.learning.create({
+    data: {
+      category: "AREA",
+      insight: "[CONTOH] Klien Surabaya Barat lebih responsif ke penawaran full-house daripada per-ruangan.",
+      supportingData: "[CONTOH] 2 dari 3 lead Surabaya Barat menanyakan paket full-house lebih dulu.",
+      sourceType: "PENGETAHUAN_OWNER",
+      confidence: "RENDAH",
+      strength: "LEMAH",
+      recommendedAction: "Tawarkan opsi full-house lebih dulu untuk lead area Surabaya Barat; catat reaksinya sebagai bukti.",
+      falsifier: "Jika 5 lead Surabaya Barat berikutnya memilih per-ruangan, buang learning ini.",
+      isExample: true,
+      evidence: {
+        create: {
+          evidenceType: "ASUMSI_OWNER",
+          polarity: "MENDUKUNG",
+          sourceKind: "PENGETAHUAN_OWNER",
+          reliabilityPct: 60,
+          note: "[CONTOH] Ingatan owner atas 3 percakapan WA terakhir dari area itu.",
+          isExample: true,
+        },
+      },
+      revisions: {
+        create: {
+          fromState: null,
+          toState: "LEMAH",
+          trigger: "[CONTOH] Learning contoh dimuat bersama data contoh.",
+          actor: "SYSTEM",
+          isExample: true,
+        },
+      },
+    },
+  });
 
   revalidatePath("/", "layout");
 }
@@ -99,6 +134,7 @@ export async function countExampleRows(): Promise<{ total: number; perTable: Arr
     ["Pain point", await db.painPoint.count({ where: { isExample: true } })],
     ["Keberatan", await db.objection.count({ where: { isExample: true } })],
     ["Sesi war room", await db.warRoomSession.count({ where: { isExample: true } })],
+    ["Learning", await db.learning.count({ where: { isExample: true } })],
   ];
   const perTable = entries.filter(([, n]) => n > 0).map(([table, n]) => ({ table, n }));
   return { total: perTable.reduce((s, t) => s + t.n, 0), perTable };
@@ -125,5 +161,10 @@ export async function deleteExampleData(formData: FormData): Promise<void> {
   await db.painPoint.deleteMany({ where: { isExample: true } });
   await db.objection.deleteMany({ where: { isExample: true } });
   await db.auditRun.deleteMany({ where: { isExample: true } }); // cascade: answers
+  // Ledger belief: hapus bukti/revisi contoh yang menempel di learning NYATA dulu,
+  // lalu learning contoh (cascade ikut membawa bukti & revisinya sendiri).
+  await db.evidenceItem.deleteMany({ where: { isExample: true } });
+  await db.beliefRevision.deleteMany({ where: { isExample: true } });
+  await db.learning.deleteMany({ where: { isExample: true } });
   revalidatePath("/", "layout");
 }

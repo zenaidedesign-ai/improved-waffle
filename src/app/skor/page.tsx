@@ -26,7 +26,7 @@ export default async function SkorPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
-        title="Algorithm Fit Score"
+        title="Skor Kelayakan Konten"
         subtitle="Rubrik 11 dimensi untuk menskor post dan ide konten. Skor adalah hipotesis sinyal yang bisa diuji — sistem membandingkan prediksi dengan hasil nyata untuk menguji rubriknya sendiri."
         action={
           <Link

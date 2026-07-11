@@ -4,6 +4,7 @@ import { getDashboardData } from "@/lib/dashboard";
 import { isLeadQualified, mapPostToInput } from "@/lib/data";
 import { db } from "@/lib/db";
 import { formatTanggal } from "@/lib/format";
+import { applyPilotTag, PILOT_PREFIX } from "@/lib/engine/pilot";
 import { getPhaseBGate } from "@/lib/pilotGate";
 import { compareByDimension } from "@/lib/engine/igDiagnosis";
 import {
@@ -48,8 +49,8 @@ export default async function KnowledgePage() {
   }));
   const channelStats = ["ADS", "IG_ORGANIK", "REFERRAL", "LAINNYA"].map((src) => ({
     channel: src,
-    leads: leads.filter((l) => l.sourceType === src).length,
-    qualified: leads.filter((l) => l.sourceType === src && isLeadQualified(l)).length,
+    leads: leads.filter((l) => l.leadSource === src).length,
+    qualified: leads.filter((l) => l.leadSource === src && isLeadQualified(l)).length,
   }));
   const suggestions = suggestLearnings({
     pillarStats,
@@ -81,9 +82,12 @@ export default async function KnowledgePage() {
   }
   async function saveManual(formData: FormData) {
     "use server";
+    // Prefix [PILOT] dipasang OTOMATIS dari checkbox — salah ketik manual tidak
+    // boleh membuat catatan pilot luput dihitung Gerbang Fase B.
+    const insight = applyPilotTag(String(formData.get("insight") ?? ""), formData.get("isPilotNote") === "on");
     await saveLearning({
       category: formData.get("category"),
-      insight: formData.get("insight"),
+      insight,
       supportingData: formData.get("supportingData"),
       sourceType: formData.get("sourceType"),
       confidence: "RENDAH",
@@ -116,7 +120,7 @@ export default async function KnowledgePage() {
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
-        title="Marketing Knowledge Engine"
+        title="Pustaka Pelajaran (Knowledge Engine)"
         subtitle="Learning yang bisa dipakai ulang — setiap insight wajib bawa data pendukung, sumber, tingkat kekuatan, dan FALSIFIER (syarat gugurnya sendiri). Satu kejadian BUKAN kebenaran: saran otomatis maksimal 'Berkembang'; 'Terbukti' hanya lewat keputusan owner atas pola yang berulang, dan hanya untuk data internal."
       />
 
@@ -363,6 +367,14 @@ export default async function KnowledgePage() {
           <textarea name="supportingData" required rows={2} placeholder="Data pendukung — WAJIB. Tanpa data, ini opini, dan akan tersimpan sebagai LEMAH." className={input} />
           <textarea name="recommendedAction" required rows={2} placeholder="Aksi yang disarankan" className={input} />
           <textarea name="falsifier" required rows={2} placeholder="Falsifier — WAJIB. Bukti apa yang akan memaksa learning ini dibuang? Contoh: 'Jika 5 lead Citraland berikutnya minta per-ruangan, buang.'" className={input} />
+          <label className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs text-blue-800">
+            <input type="checkbox" name="isPilotNote" className="mt-0.5" />
+            <span>
+              <b>Catatan pilot</b> — centang kalau ini ketidaksetujuan/konfirmasi atas vonis sistem
+              selama pilot. Prefix <code>{PILOT_PREFIX}</code> dipasang otomatis supaya terhitung di
+              Gerbang Fase B (tidak perlu diketik manual).
+            </span>
+          </label>
           <button className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700">
             Simpan (mulai sebagai LEMAH)
           </button>

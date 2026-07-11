@@ -3,20 +3,29 @@
 // nilai = max(baris Lead tertaut, isian manual) — tidak pernah dijumlahkan.
 
 import type { Campaign, CampaignMetricDaily, IgPost, Lead } from "@prisma/client";
-import { CONFIG } from "./domain/config";
 import type { StatusLampu } from "./domain/enums";
-import type { CampaignFunnelInput } from "./engine/adsRescue";
+import {
+  assessDataQuality,
+  campaignHealth,
+  computeCostChain,
+  decideCampaign,
+  diagnoseLayer,
+  type CampaignChainSummary,
+  type CampaignFunnelInput,
+  type CampaignRow,
+  type LayerDiagnosis,
+} from "./engine/adsRescue";
+import { CONFIG } from "./domain/config";
 import { applyAuditAging, combineGate0, type AuditAging } from "./engine/gates";
-import type { IgPostInput } from "./engine/types";
+import type { CostChain, IgPostInput } from "./engine/types";
+import { isQualified } from "./engine/leadTriage";
+import { DAY_MS } from "./engine/time";
 import type { WeekMetrics } from "./engine/warRoom";
 import { weekStartOf } from "./engine/warRoom";
 import { db } from "./db";
 
 export function isLeadQualified(lead: Pick<Lead, "qualityScore" | "qualAnswersCount">): boolean {
-  return (
-    lead.qualityScore >= CONFIG.leadQualifiedMinScore &&
-    lead.qualAnswersCount >= CONFIG.leadQualifiedMinAnswers
-  );
+  return isQualified(lead.qualityScore, lead.qualAnswersCount);
 }
 
 const SURVEY_OR_BEYOND = [
@@ -123,7 +132,7 @@ export function buildCampaignFunnel(
  * pendekatan (bukan tanggal kejadian sebenarnya). Diberi label di UI.
  */
 export async function getWeekMetrics(weekStart: Date): Promise<WeekMetrics> {
-  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3600 * 1000);
+  const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
   const inWeek = { gte: weekStart, lt: weekEnd };
 
   const [posts, leads, snapshot, adMetrics] = await Promise.all([
@@ -154,4 +163,49 @@ export async function getWeekMetrics(weekStart: Date): Promise<WeekMetrics> {
 
 export function currentWeekStart(): Date {
   return weekStartOf(new Date());
+}
+
+// ── Penilaian kampanye BERSAMA — dashboard & halaman kampanye WAJIB lewat sini
+// (guardrails §2.8: satu konsep = satu fungsi; dua salinan derivasi uang = bug). ──
+
+export interface CampaignAssessment {
+  campaign: Campaign & { metrics: CampaignMetricDaily[]; leads: Lead[] };
+  chain: CostChain;
+  verdict: CampaignRow["verdict"];
+  health: CampaignRow["health"];
+  layer: LayerDiagnosis;
+}
+
+export function assessCampaigns(
+  campaigns: Array<Campaign & { metrics: CampaignMetricDaily[]; leads: Lead[] }>,
+  gate0: StatusLampu | null,
+  gate1: StatusLampu | null,
+  now: Date,
+): { detail: CampaignAssessment[]; rows: CampaignRow[]; summaries: CampaignChainSummary[] } {
+  const detail = campaigns.map((c) => {
+    const chain = computeCostChain(buildCampaignFunnel(c));
+    const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
+    const dq = assessDataQuality(c.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), now);
+    const verdict = decideCampaign(chain, gate0, gate1, target, dq);
+    return { campaign: c, chain, verdict, health: campaignHealth(verdict), layer: diagnoseLayer(chain, gate0, gate1) };
+  });
+  const rows: CampaignRow[] = detail.map((d) => ({
+    id: d.campaign.id,
+    name: d.campaign.name,
+    channel: d.campaign.channel,
+    status: d.campaign.status,
+    spendRibu: d.chain.spendRibu,
+    cpqlRibu: d.chain.cpqlRibu,
+    qualifiedLeads: d.chain.qualifiedLeads,
+    health: d.health,
+    verdict: d.verdict,
+  }));
+  const summaries: CampaignChainSummary[] = detail.map((d) => ({
+    id: d.campaign.id,
+    name: d.campaign.name,
+    status: d.campaign.status,
+    targetCpqlRibu: d.campaign.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
+    chain: d.chain,
+  }));
+  return { detail, rows, summaries };
 }

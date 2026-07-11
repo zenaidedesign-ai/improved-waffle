@@ -20,22 +20,35 @@ Dokumen:
 - 📄 [`docs/PLAN-GOAL-1-IMPLEMENTATION.md`](docs/PLAN-GOAL-1-IMPLEMENTATION.md)
 - 📄 [`docs/DATA-ARCHITECTURE.md`](docs/DATA-ARCHITECTURE.md) · [`docs/API-READINESS.md`](docs/API-READINESS.md)
 
-**Catatan keamanan:** aplikasi ini single-user TANPA login — jalankan hanya di perangkat/jaringan
-yang dipercaya. Basis data = satu file SQLite (`prisma/dev.db`); cadangkan lewat Ekspor CSV.
+**Catatan keamanan:** aplikasi ini punya **gerbang login owner (Auth Tahap 1)** — satu password,
+hash scrypt di env var. PENTING: kalau password BELUM di-set, aplikasi berjalan TERBUKA penuh
+(banner peringatan tampil). Jalankan hanya di perangkat yang dipercaya; basis data = satu file
+SQLite (`prisma/dev.db`); cadangkan lewat **Pusat Cadangan** (menu Impor & Ekspor). Detail:
+`docs/AUTH-READINESS.md` · `docs/OPERATIONS-SAFETY.md`.
 
 ## Menjalankan
 
 ```bash
 npm install
-cp .env.example .env        # DATABASE_URL SQLite lokal
+cp .env.example .env.local  # auth membaca .env.local — JANGAN di-commit
 npx prisma migrate deploy   # membuat prisma/dev.db
 npm run dev                 # buka http://localhost:3000
 ```
 
-Di Ruang Kendali, klik **“Muat data contoh”** untuk melihat seluruh diagnosa bekerja dengan data
-berlabel `[CONTOH]` (bisa dihapus satu klik, tidak menyentuh data asli).
+## Urutan langkah pertama (WAJIB, sebelum data nyata)
 
-Uji: `npm run test` (51 unit test mesin aturan) · smoke E2E: `scripts/e2e-smoke.mjs`.
+1. **Set password owner:** `node scripts/set-owner-password.mjs "PasswordKuatAnda"` →
+   salin 2 baris hasilnya ke `.env.local` → restart aplikasi.
+2. **Login** di layar yang muncul.
+3. (Opsional untuk belajar) klik **"Muat data contoh"** di Dashboard — semua berlabel `[CONTOH]`.
+4. **Hapus data contoh** (Dashboard, dengan centang konfirmasi) sebelum mulai serius.
+5. **Jalankan 3 audit** dengan jawaban nyata: Akun Meta → Rekomendasi → Tracking.
+6. **Mulai pilot** di layar Pilot 14 Hari.
+7. **Input data nyata**: lead WA 7 hari terakhir, 5 post IG terakhir, CSV Ads Manager (kalau ada).
+8. **Baca Laporan Mingguan pertama** dan komit keputusan di layar Keputusan Mingguan.
+
+Uji: `npm run test` (unit test mesin aturan) · smoke E2E: `scripts/e2e-smoke.mjs`
+(lihat header file untuk ritual reset DB + env auth).
 
 ## Fondasi yang sudah diputuskan
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPilotTag,
   computePilotProgress,
   PHASE_B_LOCK_MESSAGE,
   phaseBGate,
+  PILOT_PREFIX,
   pilotDay,
   type PhaseBGateInput,
   type PilotCounts,
@@ -109,5 +111,20 @@ describe("pilotDay (kalender WIB)", () => {
     // 30 Jun 18:00 UTC = 1 Jul 01:00 WIB → hari yang sama dengan start (1 Jul WIB)
     expect(pilotDay(start, new Date("2026-07-01T16:59:00Z")).day).toBe(1); // masih 1 Jul 23:59 WIB
     expect(pilotDay(start, new Date("2026-07-01T17:01:00Z")).day).toBe(2); // 2 Jul 00:01 WIB
+  });
+});
+
+describe("applyPilotTag — prefix [PILOT] otomatis, anti salah ketik", () => {
+  it("dicentang ⇒ prefix kanonis dipasang; sudah ada ⇒ tidak dobel", () => {
+    expect(applyPilotTag("Triase Bu Ani salah", true)).toBe("[PILOT] Triase Bu Ani salah");
+    expect(applyPilotTag("[PILOT] sudah berprefix", true)).toBe("[PILOT] sudah berprefix");
+    expect(applyPilotTag("  spasi dirapikan", true)).toBe("[PILOT] spasi dirapikan");
+  });
+  it("tidak dicentang ⇒ insight apa adanya (dirapikan)", () => {
+    expect(applyPilotTag("catatan biasa", false)).toBe("catatan biasa");
+  });
+  it("prefix kanonis konsisten dengan penghitung gerbang", () => {
+    expect(PILOT_PREFIX).toBe("[PILOT]");
+    expect(applyPilotTag("x", true).startsWith(PILOT_PREFIX)).toBe(true);
   });
 });

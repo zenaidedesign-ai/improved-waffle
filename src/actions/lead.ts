@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { computeQualityScore } from "@/lib/engine/leadTriage";
 import { LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain/enums";
 
 const signal = z.coerce.number().int().min(0).max(20);
@@ -13,7 +14,7 @@ const optDate = z
 
 const leadSchema = z.object({
   name: z.string().min(1, "Nama / nomor WA wajib diisi").max(200),
-  sourceType: z.enum(LEAD_SOURCE),
+  leadSource: z.enum(LEAD_SOURCE),
   campaignId: z
     .union([z.string(), z.literal(""), z.undefined()])
     .transform((v) => (v ? v : null)),
@@ -37,7 +38,7 @@ function toData(payload: unknown) {
     ...d,
     notes: d.notes || null,
     qualityScore:
-      d.signalBudget + d.signalProjectType + d.signalLocation + d.signalUrgency + d.signalSeriousness,
+      computeQualityScore(d),
   };
 }
 

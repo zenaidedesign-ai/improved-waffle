@@ -33,7 +33,7 @@ export default async function WarRoomPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="War Room Mingguan"
+        title="Keputusan Mingguan (War Room)"
         subtitle={`Minggu mulai ${formatTanggal(weekStart)}. Baca metrik UTAMA dulu, diagnostik kedua — lalu komit maksimal ${CONFIG.warRoomMaxDecisions} keputusan untuk minggu depan.`}
       />
 

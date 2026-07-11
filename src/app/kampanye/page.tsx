@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { Card, EmptyState, GateLockBanner, PageHeader, SensitiveDataNotice, VerdictCard } from "@/components/ui";
-import { buildCampaignFunnel, getGateStatus } from "@/lib/data";
+import { assessCampaigns, getGateStatus } from "@/lib/data";
 import { db } from "@/lib/db";
-import { CONFIG } from "@/lib/domain/config";
 import { AD_CHANNEL_LABEL, LAPISAN_LABEL, type AdChannel } from "@/lib/domain/enums";
 import { formatAngka, formatJuta, formatPct, formatRibu } from "@/lib/format";
-import { assessDataQuality, campaignHealth, compareCampaigns, computeCostChain, decideCampaign, diagnoseLayer, KESEHATAN_LABEL, type CampaignChainSummary } from "@/lib/engine/adsRescue";
+import { compareCampaigns, KESEHATAN_LABEL } from "@/lib/engine/adsRescue";
 import { gateLock } from "@/lib/engine/gates";
 import { DataTruthPanel } from "@/components/DataTruthPanel";
 import { getTruthPanelData } from "@/lib/truthPanel";
@@ -20,34 +19,15 @@ export default async function KampanyePage() {
     include: { metrics: true, leads: true },
   });
 
-  const now = new Date();
-  const rows = campaigns.map((c) => {
-    const chain = computeCostChain(buildCampaignFunnel(c));
-    const target = c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu;
-    const dq = assessDataQuality(c.metrics.map((m) => ({ date: m.date, sourceType: m.sourceType })), now);
-    const verdict = decideCampaign(chain, gates.gate0, gates.gate1, target, dq);
-    return {
-      campaign: c,
-      chain,
-      verdict,
-      health: campaignHealth(verdict),
-      layer: diagnoseLayer(chain, gates.gate0, gates.gate1),
-    };
-  });
-  const summaries: CampaignChainSummary[] = campaigns.map((c) => ({
-    id: c.id,
-    name: c.name,
-    status: c.status,
-    targetCpqlRibu: c.targetCpqlRibu ?? CONFIG.adsTargetCpqlRibu,
-    chain: computeCostChain(buildCampaignFunnel(c)),
-  }));
+  // Penilaian BERSAMA dengan dashboard — satu sumber derivasi (guardrails §2.8).
+  const { detail: rows, summaries } = assessCampaigns(campaigns, gates.gate0, gates.gate1, new Date());
   const moveBudget = lock.locked ? null : compareCampaigns(summaries);
   const truth = await getTruthPanelData();
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Ads Intelligence"
+        title="Diagnosa Iklan"
         subtitle="Semua kanal (Meta, Google, TikTok, Threads) dinilai dengan rantai kebenaran yang sama: spend → chat → lead BERKUALITAS → survei → pipeline. Chat/klik murah bukan bukti iklan bekerja."
         action={
           <Link

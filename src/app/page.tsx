@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Dashboard Intelijen Pemasaran"
+        title="Dashboard Pemasaran"
         subtitle="Delapan pertanyaan eksekutif, dijawab dari data nyata. Metrik utama di atas — reach, followers, dan impresi sengaja di paling bawah."
       />
 

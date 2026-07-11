@@ -1,3 +1,5 @@
+import { dayFloorWIB } from "./time";
+
 // Pilot Data Nyata 14 Hari — pelacak kriteria sukses, murni fungsi.
 // PENTING: semua hitungan HANYA dari data nyata (isExample: false) —
 // data contoh tidak pernah dihitung sebagai kemajuan pilot.
@@ -54,6 +56,16 @@ export function computePilotProgress(c: PilotCounts): PilotProgress {
   const auto = criteria.filter((x) => !x.manual);
   const metCount = auto.filter((x) => x.met).length;
   return { criteria, metCount, totalAuto: auto.length, ready: metCount === auto.length };
+}
+
+/** Prefix kanonis catatan pilot — SATU-SATUNYA definisi; jangan tulis string-nya di tempat lain. */
+export const PILOT_PREFIX = "[PILOT]";
+
+/** Tandai insight sebagai catatan pilot tanpa mengandalkan ketikan manual (anti salah ketik). */
+export function applyPilotTag(insight: string, isPilotNote: boolean): string {
+  const clean = insight.trim();
+  if (!isPilotNote) return clean;
+  return clean.startsWith(PILOT_PREFIX) ? clean : `${PILOT_PREFIX} ${clean}`;
 }
 
 // ── Gerbang Fase B — Pilot Lock Mode ──
@@ -130,9 +142,6 @@ export interface PilotDayInfo {
   day: number | null; // 1..∞ (WIB, hari kalender)
   phase: "BELUM_MULAI" | "HARI_1" | "HARIAN" | "HARI_14" | "SELESAI";
 }
-
-const WIB_MS = 7 * 3600 * 1000;
-const dayFloorWIB = (d: Date) => Math.floor((d.getTime() + WIB_MS) / (24 * 3600 * 1000));
 
 export function pilotDay(startedAt: Date | null, now: Date): PilotDayInfo {
   if (!startedAt) return { started: false, day: null, phase: "BELUM_MULAI" };

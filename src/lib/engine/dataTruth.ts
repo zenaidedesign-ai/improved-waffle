@@ -2,6 +2,8 @@
 // Aturan utama: sistem TIDAK PERNAH berpura-pura data itu live.
 // Setiap titik data membawa: sumber, keandalan, tanggal, dan catatannya.
 
+import { ageDays } from "./time";
+
 export const DATA_SOURCE = [
   "MANUAL",
   "CSV",
@@ -102,11 +104,11 @@ export function checkFreshness(kind: FreshnessKind, lastUpdate: Date | null, now
       message: `${KIND_LABEL[kind]}: belum ada data sama sekali.`,
     };
   }
-  const ageDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (24 * 3600 * 1000));
-  if (ageDays <= threshold) return null;
+  const age = ageDays(lastUpdate, now);
+  if (age <= threshold) return null;
   return {
-    kind, ageDays, thresholdDays: threshold,
-    message: `${KIND_LABEL[kind]} basi (${ageDays} hari, ambang ${threshold} hari). Jangan ambil keputusan budget tanpa refresh.`,
+    kind, ageDays: age, thresholdDays: threshold,
+    message: `${KIND_LABEL[kind]} basi (${age} hari, ambang ${threshold} hari). Jangan ambil keputusan budget tanpa refresh.`,
   };
 }
 
@@ -188,11 +190,11 @@ export function backupDue(lastExportAt: Date | null, now: Date, maxDays: number)
       message: "Belum pernah ada cadangan. Basis data = SATU file SQLite — ekspor CSV sekarang di menu Impor & Ekspor.",
     };
   }
-  const ageDays = Math.floor((now.getTime() - lastExportAt.getTime()) / (24 * 3600 * 1000));
-  if (ageDays <= maxDays) return { due: false, message: null };
+  const age = ageDays(lastExportAt, now);
+  if (age <= maxDays) return { due: false, message: null };
   return {
     due: true,
-    message: `Cadangan CSV terakhir ${ageDays} hari lalu (ambang ${maxDays} hari). Ekspor ulang di menu Impor & Ekspor.`,
+    message: `Cadangan CSV terakhir ${age} hari lalu (ambang ${maxDays} hari). Ekspor ulang di menu Impor & Ekspor.`,
   };
 }
 

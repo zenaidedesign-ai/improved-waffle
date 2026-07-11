@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { importCsvRows, type ImportResult } from "@/actions/importCsv";
 import { CSV_DEF, mapHeader, type CsvType } from "@/lib/csv";
+import { AD_CHANNEL, AD_CHANNEL_LABEL, type AdChannel } from "@/lib/domain/enums";
 
 export function CsvImport() {
   const router = useRouter();
   const [type, setType] = useState<CsvType>("IG_POST");
   const [origin, setOrigin] = useState<"CSV" | "GOOGLE_SHEET">("CSV");
   const [forceDup, setForceDup] = useState(false);
+  const [adChannel, setAdChannel] = useState<AdChannel | "">(""); // WAJIB dipilih untuk CSV iklan
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [unmapped, setUnmapped] = useState<string[]>([]);
@@ -91,6 +93,23 @@ export function CsvImport() {
         />
       </label>
 
+      {type === "ADS_METRIC" && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-semibold text-gray-500">Platform iklan file ini (wajib — tidak ditebak):</span>
+          <select
+            value={adChannel}
+            onChange={(e) => setAdChannel(e.target.value as AdChannel | "")}
+            className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm"
+          >
+            <option value="" disabled>— pilih platform —</option>
+            {AD_CHANNEL.map((c) => (
+              <option key={c} value={c}>{AD_CHANNEL_LABEL[c]}</option>
+            ))}
+          </select>
+          <span className="text-gray-400">Kampanye BARU dari file ini akan tercatat di platform tersebut.</span>
+        </div>
+      )}
+
       {type === "LEAD" && (
         <label className="flex items-center gap-2 text-xs text-gray-600">
           <input type="checkbox" checked={forceDup} onChange={(e) => setForceDup(e.target.checked)} />
@@ -133,7 +152,7 @@ export function CsvImport() {
           </div>
           {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
           <button
-            disabled={pending || validCount === 0}
+            disabled={pending || validCount === 0 || (type === "ADS_METRIC" && adChannel === "")}
             onClick={() => {
               setError(null);
               startTransition(async () => {
@@ -144,6 +163,7 @@ export function CsvImport() {
                     fileName ?? "tanpa-nama.csv",
                     origin,
                     type === "LEAD" ? forceDup : false,
+                    type === "ADS_METRIC" ? adChannel : undefined,
                   );
                   setResult(res);
                   setRows([]);
@@ -155,7 +175,11 @@ export function CsvImport() {
             }}
             className="mt-3 w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {pending ? "Mengimpor…" : `Konfirmasi impor ${validCount} baris`}
+            {pending
+              ? "Mengimpor…"
+              : type === "ADS_METRIC" && adChannel === ""
+                ? "Pilih platform iklan dulu"
+                : `Konfirmasi impor ${validCount} baris`}
           </button>
         </div>
       )}

@@ -2,7 +2,7 @@
 // Nada: langsung, senior, fokus revenue. Aktivitas ≠ kemajuan.
 // Semua klaim dari data; bagian tanpa data bilang begitu, bukan dikarang.
 
-import type { CampaignRow } from "../dashboard";
+import type { CampaignRow } from "./adsRescue";
 import type { FollowUpItem } from "./leadTriage";
 import type { PriorityItem } from "./priorities";
 

@@ -1,6 +1,7 @@
 // Diagnosa Distribusi Instagram — murni fungsi, tanpa dependensi framework.
 
 import { CONFIG, SIGNAL_WEIGHTS } from "../domain/config";
+import { DAY_MS } from "./time";
 import { PILAR_PEMULIHAN, type Pilar } from "../domain/enums";
 import type { IgPostInput } from "./types";
 
@@ -119,7 +120,7 @@ export function nonFollowerTrend(points: Array<{ date: Date; pct: number }>): Tr
   }
   const sorted = [...points].sort((a, b) => a.date.getTime() - b.date.getTime());
   const t0 = sorted[0].date.getTime();
-  const week = 7 * 24 * 3600 * 1000;
+  const week = 7 * DAY_MS;
   const xs = sorted.map((p) => (p.date.getTime() - t0) / week);
   const ys = sorted.map((p) => p.pct);
   const n = xs.length;

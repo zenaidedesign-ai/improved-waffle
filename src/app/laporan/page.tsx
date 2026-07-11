@@ -89,8 +89,8 @@ export default async function LaporanPage() {
   const byChannel = ["ADS", "IG_ORGANIK", "REFERRAL", "LAINNYA"]
     .map((src) => ({
       src,
-      total: leadsThisWeek.filter((l) => l.sourceType === src).length,
-      qualified: leadsThisWeek.filter((l) => l.sourceType === src && isLeadQualified(l)).length,
+      total: leadsThisWeek.filter((l) => l.leadSource === src).length,
+      qualified: leadsThisWeek.filter((l) => l.leadSource === src && isLeadQualified(l)).length,
     }))
     .filter((r) => r.total > 0);
 
@@ -118,7 +118,7 @@ export default async function LaporanPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Revenue War Room — Laporan Mingguan"
+        title="Laporan Mingguan (Revenue War Room)"
         subtitle={`Minggu mulai ${formatTanggal(weekStart)}. Semua klaim membawa angka; aktivitas tanpa hasil tidak dihitung sebagai kemajuan.`}
       />
 

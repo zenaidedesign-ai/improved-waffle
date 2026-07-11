@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createLead, updateLead } from "@/actions/lead";
 import { CONFIG } from "@/lib/domain/config";
 import { LEAD_SOURCE, LEAD_STATUS, type LeadSource, type LeadStatus } from "@/lib/domain/enums";
+import { computeQualityScore, isQualified } from "@/lib/engine/leadTriage";
 
 const SIGNALS: Array<{ key: string; label: string; hint: string }> = [
   { key: "signalBudget", label: "Sinyal budget", hint: "menyebut angka / rentang = tinggi; 'yang termurah berapa' = rendah" },
@@ -17,7 +18,7 @@ const SIGNALS: Array<{ key: string; label: string; hint: string }> = [
 export interface LeadFormInitial {
   id?: string;
   name: string;
-  sourceType: LeadSource;
+  leadSource: LeadSource;
   status: LeadStatus;
   signalBudget: number;
   signalProjectType: number;
@@ -33,7 +34,7 @@ export interface LeadFormInitial {
 
 const EMPTY: LeadFormInitial = {
   name: "",
-  sourceType: "ADS",
+  leadSource: "ADS",
   status: "CHAT_BARU",
   signalBudget: 0,
   signalProjectType: 0,
@@ -54,11 +55,8 @@ export function LeadForm({ initial }: { initial?: LeadFormInitial }) {
   const [pending, startTransition] = useTransition();
   const set = (k: keyof LeadFormInitial, val: string | number) => setV((s) => ({ ...s, [k]: val }));
 
-  const score = useMemo(
-    () => v.signalBudget + v.signalProjectType + v.signalLocation + v.signalUrgency + v.signalSeriousness,
-    [v],
-  );
-  const qualified = score >= CONFIG.leadQualifiedMinScore && v.qualAnswersCount >= CONFIG.leadQualifiedMinAnswers;
+  const score = useMemo(() => computeQualityScore(v), [v]);
+  const qualified = isQualified(score, v.qualAnswersCount);
 
   const input = "w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm";
   const label = "mb-0.5 block text-xs font-semibold text-gray-500";
@@ -73,7 +71,7 @@ export function LeadForm({ initial }: { initial?: LeadFormInitial }) {
           </div>
           <div>
             <label className={label}>Sumber</label>
-            <select className={input} value={v.sourceType} onChange={(e) => set("sourceType", e.target.value)}>
+            <select className={input} value={v.leadSource} onChange={(e) => set("leadSource", e.target.value)}>
               {LEAD_SOURCE.map((s) => (
                 <option key={s} value={s}>{s === "ADS" ? "Iklan" : s === "IG_ORGANIK" ? "IG organik" : s === "REFERRAL" ? "Referral" : "Lainnya"}</option>
               ))}

@@ -8,9 +8,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { mapPostToInput } from "@/lib/data";
-import { IG_FORMAT, LEAD_SOURCE, LEAD_STATUS, PILAR } from "@/lib/domain/enums";
+import { AD_CHANNEL, IG_FORMAT, LEAD_SOURCE, LEAD_STATUS, PILAR } from "@/lib/domain/enums";
 import { computeSignalScore } from "@/lib/engine/igDiagnosis";
-import { weekStartOf } from "@/lib/engine/warRoom";
+import { computeQualityScore } from "@/lib/engine/leadTriage";
+import { DAY_MS, weekStartOf } from "@/lib/time";
 
 const num = z
   .union([z.coerce.number(), z.literal(""), z.null(), z.undefined()])
@@ -57,22 +58,30 @@ export async function importCsvRows(
   fileName: string,
   origin: "CSV" | "GOOGLE_SHEET" = "CSV",
   forceDuplicates = false, // khusus LEAD: impor juga baris yang terdeteksi duplikat
+  adChannel?: string, // khusus ADS_METRIC: platform iklan untuk kampanye BARU — wajib eksplisit
 ): Promise<ImportResult> {
   if (rows.length === 0) throw new Error("Tidak ada baris valid untuk diimpor.");
   if (rows.length > 2000) throw new Error("Maksimal 2000 baris per impor.");
+  // Kanal TIDAK PERNAH ditebak diam-diam: file Google/TikTok yang dilabeli Meta
+  // akan meracuni perbandingan kanal. Tanpa pilihan eksplisit, impor ditolak.
+  if (type === "ADS_METRIC" && !AD_CHANNEL.includes(adChannel as (typeof AD_CHANNEL)[number])) {
+    throw new Error("Pilih platform iklan (Meta/Google/TikTok/Threads) sebelum impor — kanal tidak boleh ditebak.");
+  }
+  const channel = type === "ADS_METRIC" ? (adChannel as string) : null;
   const sourceType = origin; // Layer A: asal data tercatat di setiap baris
 
   const batch = await db.importBatch.create({
     data: { type, fileName, rowCount: rows.length, origin },
   });
   const skipped: string[] = [];
+  const channelNoted = new Set<string>();
   let inserted = 0;
 
   if (type === "IG_POST") {
     for (const raw of rows) {
       const r = igRow.parse(raw);
       const dayStart = new Date(r.tanggal); dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+      const dayEnd = new Date(dayStart.getTime() + DAY_MS);
       const dup = await db.igPost.findFirst({
         where: { postedAt: { gte: dayStart, lt: dayEnd }, hook: r.hook },
       });
@@ -97,9 +106,9 @@ export async function importCsvRows(
       // Duplikat = nama + sumber + minggu masuk yang sama (bukan nama saja —
       // dua "Bu Ani" berbeda minggu/sumber adalah dua lead nyata).
       const wk = weekStartOf(r.tanggal_masuk ?? new Date());
-      const wkEnd = new Date(wk.getTime() + 7 * 24 * 3600 * 1000);
+      const wkEnd = new Date(wk.getTime() + 7 * DAY_MS);
       const dup = await db.lead.findFirst({
-        where: { name: r.nama, sourceType: r.sumber, createdAt: { gte: wk, lt: wkEnd } },
+        where: { name: r.nama, leadSource: r.sumber, createdAt: { gte: wk, lt: wkEnd } },
       });
       if (dup && !forceDuplicates) { skipped.push(`${r.nama} (${r.sumber}, minggu sama)`); continue; }
       const signals = {
@@ -109,8 +118,8 @@ export async function importCsvRows(
       };
       await db.lead.create({
         data: {
-          name: r.nama, sourceType: r.sumber, status: r.status, ...signals,
-          qualityScore: Object.values(signals).reduce((a, b) => a + b, 0),
+          name: r.nama, leadSource: r.sumber, status: r.status, ...signals,
+          qualityScore: computeQualityScore(signals),
           qualAnswersCount: r.jawaban_kualifikasi ?? 0,
           estimatedValueJuta: r.estimasi_nilai_juta ?? 0,
           createdAt: r.tanggal_masuk ?? new Date(),
@@ -126,9 +135,15 @@ export async function importCsvRows(
       const r = adsRow.parse(raw);
       const campaign = await db.campaign.upsert({
         where: { name: r.kampanye },
-        update: {},
-        create: { name: r.kampanye, channel: "META", objective: "CHAT_WA" },
+        update: {}, // kampanye lama tidak diubah — kanalnya sudah ditetapkan saat dibuat
+        create: { name: r.kampanye, channel: channel!, objective: "CHAT_WA" },
       });
+      if (campaign.channel !== channel && !channelNoted.has(campaign.name)) {
+        channelNoted.add(campaign.name);
+        skipped.push(
+          `catatan: "${r.kampanye}" sudah terdaftar sebagai ${campaign.channel} — baris masuk ke kampanye itu, bukan ${channel}`,
+        );
+      }
       const dup = await db.campaignMetricDaily.findFirst({
         where: { campaignId: campaign.id, adSetId: null, date: r.tanggal },
       });

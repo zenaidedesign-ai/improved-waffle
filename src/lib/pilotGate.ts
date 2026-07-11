@@ -1,21 +1,50 @@
-// Gerbang Fase B — pembaca keadaan bersama untuk layar Pilot & Knowledge.
-// Menghitung 8 syarat data nyata dari DB lalu menyerahkannya ke phaseBGate (engine murni).
+// Kemajuan pilot & Gerbang Fase B — SATU-SATUNYA tempat kueri hitungan pilot
+// (guardrails: "tidak ada hitungan pilot di dua tempat"). Halaman Pilot dan
+// Knowledge hanya MENAMPILKAN keluaran fungsi ini, tidak menghitung ulang.
 
 import { db } from "@/lib/db";
-import { phaseBGate, pilotDay, type PhaseBGate, type PilotDayInfo } from "@/lib/engine/pilot";
+import {
+  computePilotProgress,
+  phaseBGate,
+  PILOT_PREFIX,
+  pilotDay,
+  type PhaseBGate,
+  type PilotDayInfo,
+  type PilotProgress,
+} from "@/lib/engine/pilot";
 
-const REAL = { isExample: false } as const;
+/** Filter baku data nyata — satu definisi untuk semua kueri pilot. */
+export const REAL = { isExample: false } as const;
 
-export async function getPhaseBGate(now = new Date()): Promise<{ gate: PhaseBGate; day: PilotDayInfo }> {
+export interface PilotState {
+  gate: PhaseBGate;
+  day: PilotDayInfo;
+  progress: PilotProgress;
+  counts: {
+    realLeads: number;
+    realPosts: number;
+    adsCsvBatches: number;
+    realWarRooms: number;
+    auditTypesRun: number;
+    realSnapshots: number;
+    pilotLearnings: number;
+    exampleLeads: number;
+  };
+  startedAt: Date | null;
+}
+
+export async function getPhaseBGate(now = new Date()): Promise<PilotState> {
   const [
-    realLeads, realPosts, adsCsvBatches, realWarRooms, pilotLearnings,
-    realLearnings, exampleLeads, examplePosts, exampleCampaigns, startedSetting,
+    realLeads, realPosts, adsCsvBatches, realWarRooms, auditTypes, realSnapshots,
+    pilotLearnings, realLearnings, exampleLeads, examplePosts, exampleCampaigns, startedSetting,
   ] = await Promise.all([
     db.lead.count({ where: REAL }),
     db.igPost.count({ where: REAL }),
     db.importBatch.count({ where: { type: "ADS_METRIC" } }),
     db.warRoomSession.count({ where: REAL }),
-    db.learning.count({ where: { insight: { startsWith: "[PILOT]" } } }),
+    db.auditRun.findMany({ where: REAL, select: { type: true }, distinct: ["type"] }),
+    db.igAccountSnapshot.count({ where: REAL }),
+    db.learning.count({ where: { insight: { startsWith: PILOT_PREFIX } } }),
     db.learning.findMany({
       where: REAL,
       select: {
@@ -31,7 +60,18 @@ export async function getPhaseBGate(now = new Date()): Promise<{ gate: PhaseBGat
     db.setting.findUnique({ where: { key: "pilot.startedAt" } }),
   ]);
 
-  const day = pilotDay(startedSetting ? new Date(startedSetting.value) : null, now);
+  const startedAt = startedSetting ? new Date(startedSetting.value) : null;
+  const day = pilotDay(startedAt, now);
+  const counts = {
+    realLeads,
+    realPosts,
+    adsCsvBatches,
+    realWarRooms,
+    auditTypesRun: auditTypes.length,
+    realSnapshots,
+    pilotLearnings,
+    exampleLeads,
+  };
   const gate = phaseBGate({
     realLeads,
     realPosts,
@@ -42,5 +82,14 @@ export async function getPhaseBGate(now = new Date()): Promise<{ gate: PhaseBGat
     exampleRowsRemaining: exampleLeads + examplePosts + exampleCampaigns,
     pilotDayNumber: day.day,
   });
-  return { gate, day };
+  const progress = computePilotProgress({
+    realLeads,
+    realPosts,
+    realAdsCsvImports: adsCsvBatches,
+    warRoomSessions: realWarRooms,
+    auditTypesRun: auditTypes.length,
+    realSnapshots,
+    pilotLearnings,
+  });
+  return { gate, day, progress, counts, startedAt };
 }

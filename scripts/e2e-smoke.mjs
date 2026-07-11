@@ -49,14 +49,14 @@ await check("auth: password salah ditolak, password benar masuk", async () => {
   await page.fill('input[name="password"]', PASSWORD);
   await page.click('button:has-text("Masuk")');
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
-  await page.waitForSelector("text=Dashboard Intelijen Pemasaran");
+  await page.waitForSelector("text=Dashboard Pemasaran");
 });
 await page.screenshot({ path: SHOTS + "/00-login.png", fullPage: true });
 
 // 1. Ruang Kendali kosong — semua gerbang belum diaudit, banner kunci tampil
 await check("home: gerbang terkunci saat DB kosong", async () => {
   await page.goto(BASE + "/");
-  await page.waitForSelector("text=Dashboard Intelijen Pemasaran");
+  await page.waitForSelector("text=Dashboard Pemasaran");
   const banner = await page.textContent("body");
   if (!banner.includes("Vonis dikunci")) throw new Error("banner kunci tidak tampil");
   if (!banner.includes("Belum diaudit")) throw new Error("status belum diaudit tidak tampil");
@@ -150,7 +150,7 @@ await check("buka gerbang lalu kampanye memberi vonis nyata", async () => {
   const body = await page.textContent("body");
   if (body.includes("Vonis dikunci")) throw new Error("masih terkunci setelah semua audit hijau");
   if (!body.includes("JEBAKAN CHAT MURAH")) throw new Error("jebakan chat murah tidak terdeteksi di kampanye contoh");
-  if (!body.includes("Scale kampanye")) throw new Error("kampanye sehat tidak dapat vonis scale");
+  if (!body.includes("Perbesar kampanye")) throw new Error("kampanye sehat tidak dapat vonis perbesar (scale)");
   if (!body.includes("input manual (andal 60–90%)")) throw new Error("catatan keandalan tidak masuk KE DALAM kartu vonis (blocker #1)");
 });
 await page.screenshot({ path: SHOTS + "/07-kampanye-vonis.png", fullPage: true });
@@ -223,12 +223,14 @@ await check("knowledge: saran dari data + simpan learning", async () => {
   if (!body.includes("BEFORE_AFTER")) throw new Error("saran pilar (n≥2) tidak muncul dari data contoh");
   if (!body.includes("layak diulang")) throw new Error("saran pola kampanye scale tidak muncul");
   if (!body.includes("Gugur jika:")) throw new Error("saran tidak membawa falsifier (Fase A)");
+  if (!body.includes("[CONTOH] Klien Surabaya Barat")) throw new Error("learning contoh (ledger seed) hilang");
   await page.click('button:has-text("Simpan sebagai learning")');
   await page.waitForTimeout(2500);
   await page.goto(BASE + "/knowledge");
   const body2 = await page.textContent("body");
-  if (!body2.includes("Lemah (kejadian tunggal / sampel kecil) (1)") && !body2.includes("sampel kecil) (1)"))
-    throw new Error("learning tidak tersimpan sebagai LEMAH");
+  // 2 = learning contoh (seed) + saran yang baru disimpan
+  if (!body2.includes("sampel kecil) (2)"))
+    throw new Error("learning tidak tersimpan sebagai LEMAH (harusnya 2 LEMAH: contoh + saran)");
 });
 
 await check("knowledge fase A: provenance, ledger bukti, kontradiksi, titik buta", async () => {
@@ -250,7 +252,27 @@ await check("knowledge fase A: provenance, ledger bukti, kontradiksi, titik buta
   await page.goto(BASE + "/knowledge");
   const body3 = await page.textContent("body");
   if (!body3.includes("kontradiksi terbuka")) throw new Error("bukti menentang tidak memunculkan kontradiksi terbuka");
-  if (!body3.includes("sampel kecil) (1)")) throw new Error("status berubah otomatis — Fase A dilarang mengubah status");
+  if (!body3.includes("sampel kecil) (2)")) throw new Error("status berubah otomatis — Fase A dilarang mengubah status");
+});
+
+await check("knowledge: checkbox catatan pilot memasang prefix [PILOT] otomatis", async () => {
+  await page.goto(BASE + "/knowledge");
+  await page.fill('textarea[name="insight"]', "Triase lead uji dinilai terlalu ketat oleh owner.");
+  await page.fill('textarea[name="supportingData"]', "1 kasus: lead serius dilabel Abaikan.");
+  await page.fill('textarea[name="recommendedAction"]', "Tinjau ambang sinyal budget di hari 14.");
+  await page.fill('textarea[name="falsifier"]', "Jika 5 triase berikutnya semua disetujui owner, buang catatan ini.");
+  await page.check('input[name="isPilotNote"]');
+  await page.click('button:has-text("Simpan (mulai sebagai LEMAH)")');
+  await page.waitForTimeout(2500);
+  await page.goto(BASE + "/knowledge");
+  const body = await page.textContent("body");
+  if (!body.includes("[PILOT] Triase lead uji dinilai terlalu ketat"))
+    throw new Error("prefix [PILOT] tidak terpasang otomatis dari checkbox");
+  // Terhitung di Gerbang Fase B tanpa mengetik prefix manual
+  await page.goto(BASE + "/pilot");
+  const pilot = await page.textContent("body");
+  if (!pilot.includes("Ketidaksetujuan/konfirmasi [PILOT] tercatat di Knowledge 1/5"))
+    throw new Error("catatan pilot dari checkbox tidak terhitung di gerbang Fase B");
 });
 
 await check("impor: template unduh + ekspor CSV jalan", async () => {
@@ -260,6 +282,27 @@ await check("impor: template unduh + ekspor CSV jalan", async () => {
   const csv = await exp.text();
   if (!csv.includes("nama,sumber,status")) throw new Error("header ekspor lead rusak");
   if (!csv.includes("Bu Sari")) throw new Error("data lead tidak ikut terekspor");
+});
+
+await check("impor CSV iklan: kanal WAJIB eksplisit, tidak dipaku Meta", async () => {
+  await page.goto(BASE + "/impor");
+  await page.click('button:has-text("Metrik Iklan Harian")');
+  const csv = "kampanye,tanggal,spend_ribu,impresi,klik,hasil_platform\n[TES] Google Search Interior,2026-07-08,150,2000,45,3\n";
+  await page.setInputFiles('input[type="file"]', {
+    name: "google-ads.csv", mimeType: "text/csv", buffer: Buffer.from(csv),
+  });
+  await page.waitForSelector("text=baris siap diimpor");
+  // Tanpa kanal, tombol harus menolak
+  const btnText = await page.textContent('button:has-text("Pilih platform iklan dulu"), button:has-text("Konfirmasi impor")');
+  if (!btnText.includes("Pilih platform iklan dulu")) throw new Error("impor iklan tidak menuntut kanal eksplisit");
+  await page.selectOption("select", "GOOGLE");
+  await page.click('button:has-text("Konfirmasi impor")');
+  await page.waitForSelector("text=baris diimpor", { timeout: 15000 });
+  await page.goto(BASE + "/kampanye");
+  const body = await page.textContent("body");
+  if (!body.includes("[TES] Google Search Interior")) throw new Error("kampanye dari CSV tidak muncul");
+  const idx = body.indexOf("[TES] Google Search Interior");
+  if (!body.slice(idx, idx + 200).includes("Google")) throw new Error("kampanye CSV tidak berlabel Google — kanal salah");
 });
 
 // 9h. Pelatih Instagram
@@ -383,9 +426,21 @@ await check("hardening: hapus data contoh butuh konfirmasi & transparan jumlah b
   await page.goto(BASE + "/");
   const body = await page.textContent("body");
   if (!body.includes("baris data contoh")) throw new Error("hitungan baris contoh hilang");
+  if (!body.includes("Learning 1")) throw new Error("ledger contoh tidak ikut terhitung");
   if (!body.includes("Saya paham")) throw new Error("centang konfirmasi hilang");
   const confirmBox = await page.$('form input[type="checkbox"][name="confirm"][required]');
   if (!confirmBox) throw new Error("checkbox konfirmasi wajib tidak ditemukan");
+});
+
+await check("hardening: hapus contoh mengeksekusi — ledger contoh hilang, ledger nyata utuh", async () => {
+  await page.check('form input[type="checkbox"][name="confirm"][required]');
+  await page.click('button:has-text("baris data contoh")');
+  await page.waitForSelector("text=Tidak ada data contoh terpasang", { timeout: 20000 });
+  await page.goto(BASE + "/knowledge");
+  const body = await page.textContent("body");
+  if (body.includes("[CONTOH] Klien Surabaya Barat")) throw new Error("learning contoh tidak terhapus");
+  if (!body.includes("[PILOT] Triase lead uji")) throw new Error("learning NYATA ikut terhapus — pelanggaran fatal");
+  if (!body.includes("kontradiksi terbuka")) throw new Error("ledger bukti learning nyata ikut hilang");
 });
 
 // 13. Logout — mengunci kembali seluruh aplikasi (dijalankan TERAKHIR).

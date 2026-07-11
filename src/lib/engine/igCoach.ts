@@ -6,6 +6,7 @@
 // Tidak ada klaim algoritma rahasia. Semua saran = hipotesis yang bisa diuji.
 
 import type { IgPostInput } from "./types";
+import { DAY_MS, WIB_MS } from "./time";
 import type { Keyakinan } from "../domain/enums";
 
 // ── 1. Prinsip publik (sumber: pernyataan resmi Meta / Adam Mosseri) ──
@@ -241,7 +242,6 @@ export function coachPost(post: IgPostInput, bench: AccountBenchmarks): PostCoac
 }
 
 // ── 4. Waktu & ritme posting dari data sendiri ──
-const WIB_MS = 7 * 3600 * 1000;
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 export interface TimeSlotStat {
@@ -297,7 +297,7 @@ export function postingCadence(posts: IgPostInput[]): CadenceResult {
   const sorted = [...posts].sort((a, b) => a.postedAt.getTime() - b.postedAt.getTime());
   const gaps: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
-    gaps.push((sorted[i].postedAt.getTime() - sorted[i - 1].postedAt.getTime()) / (24 * 3600 * 1000));
+    gaps.push((sorted[i].postedAt.getTime() - sorted[i - 1].postedAt.getTime()) / DAY_MS);
   }
   const m = Math.round(median(gaps) * 10) / 10;
   return {

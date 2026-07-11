@@ -4,6 +4,7 @@
 // memanggil = bug; lihat tests/engine/gates.test.ts.
 
 import { CONFIG } from "../domain/config";
+import { ageDays } from "./time";
 import type { StatusLampu } from "../domain/enums";
 import type { AuditAnswerInput, GateResult, VerdictProposal } from "./types";
 import type { AuditItemDef } from "../domain/auditItems";
@@ -89,9 +90,9 @@ export function applyAuditAging(
   now: Date,
 ): { verdict: StatusLampu | null; aging: AuditAging | null } {
   if (verdict === null || runDate === null) return { verdict, aging: null };
-  const ageDays = Math.floor((now.getTime() - runDate.getTime()) / (24 * 3600 * 1000));
-  const aged = ageDays > CONFIG.auditMaxAgeDays;
-  const aging: AuditAging = { aged, ageDays, maxDays: CONFIG.auditMaxAgeDays };
+  const age = ageDays(runDate, now);
+  const aged = age > CONFIG.auditMaxAgeDays;
+  const aging: AuditAging = { aged, ageDays: age, maxDays: CONFIG.auditMaxAgeDays };
   if (!aged) return { verdict, aging };
   return { verdict: verdict === "HIJAU" ? "KUNING" : verdict, aging };
 }

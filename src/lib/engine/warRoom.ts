@@ -68,18 +68,5 @@ export function buildWeeklyCompare(thisWeek: WeekMetrics, lastWeek: WeekMetrics 
   ];
 }
 
-/**
- * Awal minggu = Senin 00:00 WIB (Asia/Jakarta, UTC+7 tanpa DST) — konsisten di
- * seluruh app, tidak peduli timezone server. Mengembalikan instan UTC yang
- * bertepatan dengan Senin 00:00 WIB.
- */
-const WIB_OFFSET_MS = 7 * 3600 * 1000;
-
-export function weekStartOf(d: Date): Date {
-  const wib = new Date(d.getTime() + WIB_OFFSET_MS);
-  const day = wib.getUTCDay(); // 0 = Minggu (dalam kerangka WIB)
-  const diff = day === 0 ? 6 : day - 1;
-  wib.setUTCDate(wib.getUTCDate() - diff);
-  wib.setUTCHours(0, 0, 0, 0);
-  return new Date(wib.getTime() - WIB_OFFSET_MS);
-}
+// Awal minggu (Senin 00:00 WIB) kini tinggal di engine/time.ts — re-export demi kompatibilitas.
+export { weekStartOf } from "./time";

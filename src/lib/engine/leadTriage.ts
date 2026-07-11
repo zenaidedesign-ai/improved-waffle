@@ -4,6 +4,26 @@
 // diberi label — bukan kotak hitam.
 
 import { CONFIG } from "../domain/config";
+import { ageDays } from "./time";
+
+// ── Skoring lead — SATU sumber kebenaran (guardrails §2.8) ──
+export interface LeadSignals {
+  signalBudget: number;
+  signalProjectType: number;
+  signalLocation: number;
+  signalUrgency: number;
+  signalSeriousness: number;
+}
+
+/** Skor kualitas lead = jumlah 5 sinyal (masing-masing 0–20). Form, aksi, seed, dan impor CSV WAJIB lewat sini. */
+export function computeQualityScore(s: LeadSignals): number {
+  return s.signalBudget + s.signalProjectType + s.signalLocation + s.signalUrgency + s.signalSeriousness;
+}
+
+/** Predikat lead berkualitas — ambang dari CONFIG, logika hanya di sini. */
+export function isQualified(qualityScore: number, qualAnswersCount: number): boolean {
+  return qualityScore >= CONFIG.leadQualifiedMinScore && qualAnswersCount >= CONFIG.leadQualifiedMinAnswers;
+}
 
 export const TRIAGE = ["HOT_LEAD", "URGENT", "FOLLOW_UP", "NURTURE", "IGNORE", "DEAD_LEAD"] as const;
 export type Triage = (typeof TRIAGE)[number];
@@ -59,8 +79,7 @@ const BASE_PROB: Record<string, number> = {
 };
 
 export function silentDaysOf(lead: LeadTriageInput, now: Date): number {
-  const ref = lead.lastContactAt ?? lead.createdAt;
-  return Math.max(0, Math.floor((now.getTime() - ref.getTime()) / (24 * 3600 * 1000)));
+  return ageDays(lead.lastContactAt ?? lead.createdAt, now);
 }
 
 export function closingProbability(lead: LeadTriageInput, now: Date): number {
@@ -76,10 +95,7 @@ export function closingProbability(lead: LeadTriageInput, now: Date): number {
 }
 
 export function isQualifiedInput(lead: LeadTriageInput): boolean {
-  return (
-    lead.qualityScore >= CONFIG.leadQualifiedMinScore &&
-    lead.qualAnswersCount >= CONFIG.leadQualifiedMinAnswers
-  );
+  return isQualified(lead.qualityScore, lead.qualAnswersCount);
 }
 
 export function triageLead(lead: LeadTriageInput, now: Date): TriageResult {
