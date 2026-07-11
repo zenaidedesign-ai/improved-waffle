@@ -1,17 +1,21 @@
 # Operations Safety — Menjalankan Zenaide Revenue Engine dengan Aman (Pra-Auth)
 
 Dokumen ini untuk Noor. Bahasanya sengaja langsung. Status keamanan hari ini, jujur:
-**aplikasi belum punya login** — perlindungan satu-satunya adalah perangkat tempat dia berjalan.
+**gerbang password owner (Auth Tahap 1) sudah dibangun, tapi hanya hidup kalau password
+di-set** — tanpa itu aplikasi tetap terbuka penuh.
 
-## 1. Cara aman menjalankan sistem SEBELUM auth ada
+## 1. Cara aman menjalankan sistem
 
-- Jalankan HANYA di laptop pribadi owner, dengan password OS dan layar terkunci otomatis.
-- JANGAN deploy ke internet. JANGAN pasang di komputer kantor bersama.
-- JANGAN bagikan alamat aplikasi (localhost/IP) ke siapa pun di luar diri sendiri.
-- Kalau laptop dipakai orang lain sebentar: tutup browser dulu. Peringatan oranye di layar
-  sensitif adalah pengingat, BUKAN perlindungan.
-- Basis data = SATU file: `prisma/dev.db`. Siapa pun yang memegang file itu memegang semua
-  data bisnis. Perlakukan seperti buku rekening.
+- **Langkah pertama, sekali saja: set password owner** —
+  `node scripts/set-owner-password.mjs "PasswordKuatAnda"`, salin hasilnya ke `.env.local`,
+  restart. Panduan lengkap: `docs/AUTH-READINESS.md` §0.
+- Tetap jalankan HANYA di laptop pribadi owner, dengan password OS dan layar terkunci
+  otomatis — login aplikasi TIDAK menggantikan kunci laptop.
+- JANGAN deploy ke internet (masih HOLD). JANGAN pasang di komputer kantor bersama.
+- JANGAN bagikan alamat aplikasi maupun password ke siapa pun — satu password = identitas owner.
+- Peringatan oranye di layar sensitif adalah pengingat; gerbangnya adalah login + laptop terkunci.
+- Basis data = SATU file: `prisma/dev.db`. Siapa pun yang memegang file itu (atau `.env.local`)
+  memegang semua data bisnis. Perlakukan seperti buku rekening.
 
 ## 2. Cara backup (Pusat Cadangan, menu Impor & Ekspor)
 
@@ -46,7 +50,7 @@ Jangan kirim lewat grup WA, email umum, atau folder bersama staf.
 ## 4. Kapan staf boleh mulai memakai sistem
 
 **Belum sekarang.** Syarat minimal sebelum staf pertama diberi akses:
-1. Auth Tahap 1 terpasang & teruji (lihat `docs/AUTH-READINESS.md`) — minimal satu password owner.
+1. ✅ Auth Tahap 1 terpasang & teruji — tinggal DIKONFIGURASI (set password) di perangkat owner.
 2. Peran STAF dari rencana auth diberlakukan (staf = jalur input; owner = keputusan & uang).
 3. Pilot 14 hari selesai — supaya yang diajarkan ke staf adalah alur yang sudah terbukti.
 4. Cadangan mingguan sudah jadi kebiasaan (minimal 2 cadangan tersimpan).
@@ -56,7 +60,7 @@ Sampai keempatnya terpenuhi: staf boleh MELIHAT layar bersama owner, tidak memeg
 
 | # | Pertanyaan | Status hari ini | Syarat lolos |
 |---|---|---|---|
-| 1 | Auth siap? | ❌ BELUM — tidak ada login | Auth Tahap 1 terpasang + teruji |
+| 1 | Auth siap? | ⚠ Tahap 1 TERPASANG & teruji; hidup hanya jika `ZENAIDE_AUTH_HASH` di-set | Password owner di-set di perangkat yang dipakai + login terbukti jalan |
 | 2 | Backup siap? | ✅ Jalur manual siap (Pusat Cadangan); disiplin mingguan belum terbukti | ≥ 2 cadangan mingguan berturut tersimpan |
 | 3 | Database aman? | ⚠ SQLite satu file, aman selama lokal di laptop terkunci | File DB di disk terenkripsi + backup rutin; kalau multi-user: pindah server DB |
 | 4 | Data contoh bersih? | Dicek live di Dashboard & Gerbang Fase B | 0 baris contoh |
@@ -70,7 +74,8 @@ Sampai keempatnya terpenuhi: staf boleh MELIHAT layar bersama owner, tidak memeg
 ## 6. Yang harus terjadi sebelum deployment (urutan)
 
 1. Pilot 14 hari selesai + tuning Hari-14.
-2. Auth Tahap 1 dibangun, diuji (login/logout/pagar middleware), di-review.
+2. ✅ Auth Tahap 1 dibangun & diuji — pastikan password di-set di lingkungan tujuan
+   (tanpa `ZENAIDE_AUTH_HASH`, aplikasi terbuka penuh — dilarang deploy begitu).
 3. Kebiasaan backup terbukti (≥ 2 minggu berturut).
 4. Uji restore satu kali dari cadangan sungguhan.
 5. Keputusan deploy eksplisit dari owner — target, biaya, dan siapa yang bisa mengaksesnya

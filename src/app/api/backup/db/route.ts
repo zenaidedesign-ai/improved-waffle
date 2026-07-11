@@ -6,11 +6,15 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { apiSessionValid } from "@/lib/apiAuth";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!(await apiSessionValid())) {
+    return NextResponse.json({ error: "Perlu login." }, { status: 401 });
+  }
   const now = new Date();
   const stamp = now.toISOString().slice(0, 10);
   const tmp = path.join(process.cwd(), "prisma", `backup-tmp-${now.getTime()}.db`);

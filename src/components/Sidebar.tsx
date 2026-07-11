@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/actions/auth";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: "🎛️" },
@@ -28,8 +29,9 @@ const NAV = [
   { href: "/impor", label: "Impor & Ekspor", icon: "📥" },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({ showLogout }: { showLogout: boolean }) {
   const pathname = usePathname();
+  if (pathname === "/login") return null; // layar login berdiri sendiri, tanpa navigasi
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
       <div className="border-b border-gray-200 px-4 py-4">
@@ -58,9 +60,18 @@ export function Sidebar() {
           ),
         )}
       </nav>
-      <div className="border-t border-gray-200 p-3 text-[10px] leading-relaxed text-gray-400">
-        Semua data: manual / CSV / screenshot — TANPA API live. Metrik utama: lead berkualitas,
-        survei, proposal, closing, pipeline.
+      <div className="border-t border-gray-200 p-3">
+        {showLogout && (
+          <form action={logout} className="mb-2">
+            <button className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100">
+              🚪 Keluar
+            </button>
+          </form>
+        )}
+        <div className="text-[10px] leading-relaxed text-gray-400">
+          Semua data: manual / CSV / screenshot — TANPA API live. Metrik utama: lead berkualitas,
+          survei, proposal, closing, pipeline.
+        </div>
       </div>
     </aside>
   );

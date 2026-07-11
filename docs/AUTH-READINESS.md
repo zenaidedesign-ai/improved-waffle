@@ -1,19 +1,49 @@
 # Auth Readiness Plan — Zenaide Revenue Engine
 
-**Status hari ini (jujur): BELUM ADA AUTENTIKASI.** Siapa pun yang bisa membuka alamat aplikasi
-bisa melihat dan mengubah SEMUA data. Ini keputusan sadar untuk fase lokal-single-user, bukan
-kelalaian — tapi harus jelas batasnya, dan dokumen ini adalah rencananya. Aplikasi TIDAK BOLEH
-disebut "aman" sebelum rencana ini diimplementasikan dan diuji.
+**Status hari ini (jujur): Tahap 1 TERPASANG, aktif hanya jika dikonfigurasi.**
+Gerbang password owner sudah dibangun dan diuji (unit + E2E). PENTING: kalau env var
+`ZENAIDE_AUTH_HASH` TIDAK di-set, aplikasi berjalan MODE TANPA LOGIN — terbuka penuh,
+dengan banner peringatan. Aplikasi baru boleh disebut "terkunci" setelah password di-set
+dan login terbukti jalan di perangkat itu. Ini gerbang satu-owner, BUKAN keamanan kelas
+produksi multi-user.
+
+## 0. Cara pakai Tahap 1 (setup, login, logout)
+
+**Set password (sekali):**
+1. `node scripts/set-owner-password.mjs "PasswordKuatAnda"` (minimal 8 karakter).
+2. Salin DUA baris hasilnya (`ZENAIDE_AUTH_HASH` + `ZENAIDE_SESSION_SECRET`) ke file
+   `.env.local` di folder proyek. File ini di-gitignore — JANGAN di-commit, jangan
+   dikirim lewat chat/email. Contoh kerangka: `.env.example`.
+3. Restart aplikasi. Semua halaman & API kini menuntut login.
+
+**Login:** buka aplikasi → diarahkan ke `/login` → masukkan password → masuk.
+Salah 5× berturut = jeda 15 menit.
+
+**Logout:** tombol "🚪 Keluar" di bawah menu samping.
+
+**Perilaku sesi:** cookie HttpOnly bertanda tangan HMAC, umur 7 hari, lalu harus login
+ulang. Logout menghapus cookie DI BROWSER ITU SAJA — token yang sudah dicuri tetap sah
+sampai kedaluwarsa. Mencabut SEMUA sesi sekaligus: ganti nilai `ZENAIDE_SESSION_SECRET`
+(atau ganti password) lalu restart.
+
+**Ganti password:** ulangi langkah set password dengan password baru — semua sesi lama
+otomatis gugur.
+
+**Lupa password:** tidak ada reset mandiri (by design). Jalankan ulang skrip set password
+dari terminal laptop yang memegang proyek.
 
 ## 1. Pendekatan auth yang direkomendasikan (saat waktunya tiba)
 
-**Tahap 1 — kunci satu pintu (paling kecil yang bermakna):**
-- Satu password owner, disimpan sebagai **hash** (argon2/bcrypt) di environment variable —
-  BUKAN plaintext, BUKAN di database, BUKAN di repo.
-- Session cookie ber-tanda-tangan (HttpOnly, Secure, SameSite=Lax) lewat `middleware.ts`
-  Next.js yang memagari SEMUA route kecuali `/login`.
-- Tanpa registrasi, tanpa reset password mandiri (reset = ganti env var oleh owner).
-- Perkiraan kerja: kecil; tanpa dependensi layanan luar; cocok dengan SQLite lokal.
+**Tahap 1 — kunci satu pintu — ✅ TERPASANG (Juli 2026):**
+- Satu password owner, disimpan sebagai hash **scrypt** bersalt di env var
+  `ZENAIDE_AUTH_HASH` — BUKAN plaintext, BUKAN di database, BUKAN di repo
+  (`src/lib/auth.ts`; node:crypto, tanpa dependensi baru).
+- Cookie sesi bertanda tangan HMAC-SHA256 (HttpOnly, SameSite=Lax, Secure di produksi),
+  divalidasi `src/middleware.ts` yang memagari SEMUA route kecuali `/login` dan aset statis.
+  API tanpa sesi mendapat 401; halaman diarahkan ke `/login`.
+- Lapis kedua: route pengeluaran data (unduh DB `/api/backup/db`, ekspor `/api/export/*`)
+  memeriksa sesinya sendiri (`src/lib/apiAuth.ts`) — tidak menggantungkan diri pada matcher.
+- Tanpa registrasi, tanpa reset mandiri; rate-limit login 5×/15 menit (in-memory).
 
 **Tahap 2 — multi-user (hanya jika staf benar-benar butuh akses):**
 - Tabel `User` (id, nama, passwordHash, role) + session di database.
@@ -39,25 +69,31 @@ Ads Intelligence/Kampanye (berisi spend) · War Room & Laporan Revenue (berisi n
 Impor & Ekspor (bisa mengeluarkan seluruh database) · Dashboard (agregat uang).
 Praktisnya: **hampir semua layar** — karena itu Tahap 1 memagari seluruh aplikasi, bukan per-halaman.
 
-## 4. Alur login masa depan (Tahap 1)
+## 4. Alur login (Tahap 1 — terpasang)
 
-1. Buka aplikasi → `middleware.ts` cek cookie sesi → tidak ada → redirect `/login`.
-2. `/login`: satu kolom password → verifikasi hash → set cookie sesi (umur 7 hari, diperpanjang saat aktif).
-3. Logout = hapus cookie. Salah password 5× berturut → jeda 15 menit (rate-limit sederhana di memori).
-4. Tidak ada "ingat saya" di perangkat bersama — cookie berakhir, titik.
+1. Buka aplikasi → `middleware.ts` cek cookie sesi → tidak valid → redirect `/login`
+   (API → 401).
+2. `/login`: satu kolom password → verifikasi hash scrypt → set cookie sesi umur 7 hari
+   (TIDAK diperpanjang otomatis — habis ya login ulang).
+3. Logout = hapus cookie. Salah password 5× berturut → jeda 15 menit (in-memory).
+4. Tidak ada "ingat saya" — cookie berakhir, titik.
 
-## 5. Risiko SELAMA auth belum ada (kondisi sekarang)
+## 5. Yang MASIH tidak aman setelah Tahap 1 (jujur)
 
-- **Siapa pun di perangkat/jaringan yang sama = akses penuh**, termasuk hapus data dan unduh
-  seluruh database dari Pusat Cadangan.
-- Karena itu aturan operasional pra-auth (docs/OPERATIONS-SAFETY.md): jalankan HANYA di laptop
-  pribadi owner yang terkunci password OS, JANGAN di-deploy ke internet, JANGAN dibuka lewat
-  Wi-Fi publik dengan port terbuka, JANGAN dibagikan alamatnya.
-- Layar sensitif kini menampilkan peringatan permanen — itu PENGINGAT, bukan perlindungan.
-- **Deployment tetap HOLD sampai minimal Tahap 1 terpasang + teruji.**
+- **Env belum di-set = terbuka penuh.** Gerbang hanya hidup kalau `ZENAIDE_AUTH_HASH` ada.
+  Layar login dan banner menyatakannya terang-terangan; checklist produksi menahannya.
+- **Satu password bersama = satu identitas.** Tidak ada audit "siapa melakukan apa";
+  siapa pun yang tahu password adalah "owner".
+- **Logout tidak mencabut token di perangkat lain** (sesi stateless) — pencabutan total
+  hanya lewat ganti secret/password.
+- **Rate-limit in-memory** hilang saat restart; bukan perlindungan brute-force kelas produksi.
+- **Transportasi:** di luar localhost, keamanan cookie bergantung HTTPS — alasan tambahan
+  deployment tetap HOLD sampai ada TLS.
+- Fisik tetap fisik: laptop tak terkunci = semua terbuka; file `dev.db` dan `.env.local`
+  yang dicuri = semua data + gerbangnya.
 
-## 6. Pemicu implementasi
+## 6. Pemicu Tahap 2 (multi-user)
 
-Auth Tahap 1 dibangun ketika salah satu terjadi: (a) aplikasi akan diakses dari luar laptop owner,
-(b) staf pertama diberi akses, atau (c) owner memintanya. Implementasi = perubahan ber-review
-sendiri, dengan tes login/logout/pagar middleware — bukan tempelan diam-diam.
+Tahap 2 dibangun HANYA ketika staf pertama benar-benar akan memegang aplikasi sendiri:
+tabel User + peran STAF/BACA-SAJA sesuai matriks §2, audit trail actor per aksi, dan
+review keamanan ulang. Sampai saat itu, staf-use = HOLD (lihat docs/OPERATIONS-SAFETY.md §4).

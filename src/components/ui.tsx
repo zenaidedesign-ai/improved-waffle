@@ -95,17 +95,25 @@ export function Card({ title, children, className = "" }: { title?: string; chil
 }
 
 /**
- * Peringatan layar sensitif — JUJUR, bukan keamanan palsu: aplikasi ini BELUM punya login,
- * jadi satu-satunya perlindungan saat ini adalah perangkat & jaringan yang dipakai.
- * Rencana auth sesungguhnya: docs/AUTH-READINESS.md.
+ * Peringatan layar sensitif — JUJUR di dua mode, bukan keamanan palsu.
+ * Login aktif (ZENAIDE_AUTH_HASH di-set): mengingatkan batas gerbang satu-password.
+ * Login belum di-set: menyatakan terang-terangan aplikasi terbuka penuh.
+ * Rencana & batas auth: docs/AUTH-READINESS.md.
  */
 export function SensitiveDataNotice() {
-  return (
+  const authOn = !!process.env.ZENAIDE_AUTH_HASH; // hanya dibaca di server component
+  return authOn ? (
     <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
-      🔐 Layar ini berisi <b>data bisnis sensitif</b> (lead, nilai proyek, strategi). Sistem ini{" "}
-      <b>belum punya login</b> — siapa pun yang bisa membuka aplikasi ini bisa melihat semuanya.
-      Jangan buka di perangkat atau jaringan yang tidak tepercaya, dan jangan bagikan alamat
-      aplikasi ke luar tim inti.
+      🔐 Layar ini berisi <b>data bisnis sensitif</b> (lead, nilai proyek, strategi) di balik{" "}
+      <b>login owner</b>. Ingat batasnya: satu password = identitas owner — jangan bagikan
+      password, jangan login di perangkat yang bukan milik Anda, dan tetap kunci laptop.
+    </div>
+  ) : (
+    <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+      🔐 Layar ini berisi <b>data bisnis sensitif</b> (lead, nilai proyek, strategi). Login{" "}
+      <b>belum dikonfigurasi</b> — siapa pun yang bisa membuka aplikasi ini bisa melihat
+      semuanya. Set password owner sekarang: <code>node scripts/set-owner-password.mjs</code>{" "}
+      (panduan: docs/AUTH-READINESS.md). Jangan buka di perangkat/jaringan tidak tepercaya.
     </div>
   );
 }

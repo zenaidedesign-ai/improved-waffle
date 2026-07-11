@@ -1,9 +1,13 @@
 // Jalankan: reset DB (rm prisma/dev.db && npx prisma migrate deploy),
-// start server BARU (npm run start -- -p 3100), lalu: node scripts/e2e-smoke.mjs
-// E2E smoke test: muat data contoh, jalankan semua layar, ambil screenshot.
+// start server BARU dengan auth aktif:
+//   ZENAIDE_AUTH_HASH=$(node -e 'const{scryptSync}=require("crypto");const s="e2esalt00000000";console.log(`scrypt:${s}:${scryptSync("zenaide-e2e","" + s,32).toString("hex")}`)') \
+//   npm run start -- -p 3100
+// lalu: node scripts/e2e-smoke.mjs   (password uji: E2E_PASSWORD, default "zenaide-e2e")
+// E2E smoke test: gerbang auth dulu, lalu muat data contoh & jalankan semua layar.
 import { chromium } from "playwright-core";
 
 const BASE = "http://localhost:3100";
+const PASSWORD = process.env.E2E_PASSWORD ?? "zenaide-e2e";
 const SHOTS = process.env.SHOTS_DIR ?? "./e2e-shots";
 import { mkdirSync } from "fs";
 mkdirSync(SHOTS, { recursive: true });
@@ -24,6 +28,30 @@ async function check(name, fn) {
     results.push(`FAIL  ${name}: ${e.message.split("\n")[0]}`);
   }
 }
+
+// 0. Auth Tahap 1 — SEMUA terkunci sebelum login; API mengembalikan 401, bukan data.
+await check("auth: tanpa login halaman redirect & API sensitif 401", async () => {
+  await page.goto(BASE + "/leads");
+  await page.waitForURL(/\/login/, { timeout: 15000 });
+  for (const api of ["/api/backup/db", "/api/export/lead"]) {
+    const r = await page.request.get(BASE + api);
+    if (r.status() !== 401) throw new Error(`${api} tanpa login harus 401, dapat ${r.status()}`);
+  }
+});
+
+await check("auth: password salah ditolak, password benar masuk", async () => {
+  await page.goto(BASE + "/login");
+  await page.fill('input[name="password"]', "password-yang-salah");
+  await page.click('button:has-text("Masuk")');
+  await page.waitForURL(/error=salah/, { timeout: 15000 });
+  const body = await page.textContent("body");
+  if (!body.includes("Password salah")) throw new Error("pesan password salah tidak tampil");
+  await page.fill('input[name="password"]', PASSWORD);
+  await page.click('button:has-text("Masuk")');
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
+  await page.waitForSelector("text=Dashboard Intelijen Pemasaran");
+});
+await page.screenshot({ path: SHOTS + "/00-login.png", fullPage: true });
 
 // 1. Ruang Kendali kosong — semua gerbang belum diaudit, banner kunci tampil
 await check("home: gerbang terkunci saat DB kosong", async () => {
@@ -323,12 +351,14 @@ await check("top 5 penuh; keputusan war room tercatat di sesi", async () => {
 await page.screenshot({ path: SHOTS + "/09-home-final.png", fullPage: true });
 
 // 12. Infrastructure hardening: peringatan sensitif, pusat cadangan, konfirmasi hapus contoh
-await check("hardening: notifikasi sensitif di layar rawan + jujur soal tanpa login", async () => {
+await check("hardening: notifikasi sensitif di layar rawan + jujur soal mode auth", async () => {
   for (const path of ["/leads", "/kampanye", "/war-room", "/knowledge", "/pilot", "/impor"]) {
     await page.goto(BASE + path);
     const body = await page.textContent("body");
     if (!body.includes("data bisnis sensitif")) throw new Error(`peringatan sensitif hilang di ${path}`);
-    if (!body.includes("belum punya login")) throw new Error(`kejujuran 'belum punya login' hilang di ${path}`);
+    // Suite jalan dengan auth AKTIF — teks harus versi login owner, bukan versi terbuka.
+    if (!body.includes("login owner")) throw new Error(`teks mode login-aktif hilang di ${path}`);
+    if (body.includes("belum dikonfigurasi")) throw new Error(`teks mode terbuka salah tampil di ${path}`);
   }
 });
 
@@ -356,6 +386,17 @@ await check("hardening: hapus data contoh butuh konfirmasi & transparan jumlah b
   if (!body.includes("Saya paham")) throw new Error("centang konfirmasi hilang");
   const confirmBox = await page.$('form input[type="checkbox"][name="confirm"][required]');
   if (!confirmBox) throw new Error("checkbox konfirmasi wajib tidak ditemukan");
+});
+
+// 13. Logout — mengunci kembali seluruh aplikasi (dijalankan TERAKHIR).
+await check("auth: logout mengunci kembali halaman & API", async () => {
+  await page.goto(BASE + "/");
+  await page.click('button:has-text("Keluar")');
+  await page.waitForURL(/\/login/, { timeout: 15000 });
+  await page.goto(BASE + "/leads");
+  await page.waitForURL(/\/login/, { timeout: 15000 });
+  const r = await page.request.get(BASE + "/api/backup/db");
+  if (r.status() !== 401) throw new Error(`setelah logout, backup DB harus 401, dapat ${r.status()}`);
 });
 
 await browser.close();

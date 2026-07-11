@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { apiSessionValid } from "@/lib/apiAuth";
 import { db } from "@/lib/db";
 import { CSV_DEF, toCsv } from "@/lib/csv";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ jenis: string }> }) {
+  if (!(await apiSessionValid())) {
+    return NextResponse.json({ error: "Perlu login." }, { status: 401 });
+  }
   const { jenis } = await ctx.params;
   const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
